@@ -5,16 +5,16 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 
-export default function BenefitsScreen() {
+export default function ProfileScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
         <ThemedView style={styles.heroSection}>
           <ThemedText type="title" style={styles.title}>
-            Benefits Page
+            Profile Page
           </ThemedText>
           <ThemedText style={styles.subtitle} themeColor="textSecondary">
-            Manage and view your available benefits.
+            Manage your account settings, details, and security.
           </ThemedText>
         </ThemedView>
       </SafeAreaView>
@@ -50,4 +50,3 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
-
