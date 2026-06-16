@@ -2,6 +2,7 @@ import { SymbolView } from 'expo-symbols';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ProfileCard } from '@/components/profile/profile-card';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -55,15 +56,11 @@ export default function ProfileScreen() {
   const theme = useTheme();
 
   return (
-    <ScrollView
-      style={[styles.scrollView, { backgroundColor: theme.backgroundElement }]}
-      contentContainerStyle={styles.scrollContent}>
-      {/* Header Section */}
-      <View style={[styles.headerGradient, { paddingTop: insets.top + Spacing.four }]}>
+    <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
+      <ScreenHeader>
         <View style={styles.headerContent}>
           <View style={styles.avatar}>
             <ThemedText style={styles.avatarText}>{mockProfileData.header.initials}</ThemedText>
-            {/* Active dot */}
             <View style={styles.activeDot} />
           </View>
           <View style={styles.headerInfo}>
@@ -85,9 +82,10 @@ export default function ProfileScreen() {
             <ThemedText style={styles.headerSubtext}>ID: {mockProfileData.header.id}</ThemedText>
           </View>
         </View>
-      </View>
+      </ScreenHeader>
 
-      <View style={styles.cardsContainer}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+        <View style={styles.cardsContainer}>
         {/* Evaluation Score */}
         <ProfileCard
           title="Evaluation Score"
@@ -259,10 +257,14 @@ export default function ProfileScreen() {
         </ProfileCard>
       </View>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   scrollView: {
     flex: 1,
   },

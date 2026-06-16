@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
 import { MetricCard } from '@/components/tickets/metric-card';
 import { TicketCard } from '@/components/tickets/ticket-card';
@@ -23,27 +24,22 @@ export default function TicketsScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + Spacing.four }]}>
-        <View style={styles.headerContent}>
-          <View style={styles.headerTextContainer}>
-            <ThemedText type="subtitle" style={styles.headerTitle}>
-              Ticket System
-            </ThemedText>
-            <ThemedText style={styles.headerSubtitle}>One click, one ticket, one solution</ThemedText>
-          </View>
+      <ScreenHeader
+        title="Ticket System"
+        subtitle="One click, one ticket, one solution"
+        rightContent={
           <View style={styles.headerActions}>
+            <Pressable style={styles.settingsButton}>
+              <SymbolView name="gearshape" size={16} tintColor="#ffffff" />
+            </Pressable>
             <Pressable style={styles.newTicketButton}>
               <SymbolView name="plus" size={14} tintColor="#ffffff" />
               <ThemedText type="smallBold" style={styles.newTicketText}>
                 New Ticket
               </ThemedText>
             </Pressable>
-            <Pressable style={styles.settingsButton}>
-              <SymbolView name="gearshape" size={18} tintColor="#ffffff" />
-            </Pressable>
           </View>
-        </View>
-
+        }>
         {/* Metrics Row */}
         <ScrollView
           horizontal
@@ -51,7 +47,11 @@ export default function TicketsScreen() {
           contentContainerStyle={styles.metricsContainer}>
           <MetricCard title="Total" value={metrics.total} />
           {metrics.needAttention && (
-            <MetricCard title="Need Attention" value={metrics.needAttention} highlightColor="#D32F2F" />
+            <MetricCard
+              title="Need Attention"
+              value={metrics.needAttention}
+              highlightColor="#D32F2F"
+            />
           )}
           <MetricCard
             title="Open"
@@ -61,7 +61,7 @@ export default function TicketsScreen() {
           />
           <MetricCard title="Resolved" value={metrics.resolved} highlightColor="#388E3C" />
         </ScrollView>
-      </View>
+      </ScreenHeader>
 
       {/* Sticky Content: Search and Tabs */}
       <View style={[styles.stickySection, { backgroundColor: theme.background }]}>
