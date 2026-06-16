@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
@@ -11,6 +12,7 @@ import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function TicketsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
   const [activeTab, setActiveTab] = useState<'myTickets' | 'pendingRequests'>('myTickets');
@@ -28,10 +30,7 @@ export default function TicketsScreen() {
         subtitle="One click, one ticket, one solution"
         rightContent={
           <View style={styles.headerActions}>
-            <Pressable style={styles.settingsButton}>
-              <SymbolView name="gearshape" size={16} tintColor="#ffffff" />
-            </Pressable>
-            <Pressable style={styles.newTicketButton}>
+            <Pressable style={styles.newTicketButton} onPress={() => router.push('/new-ticket')}>
               <SymbolView name="plus" size={14} tintColor="#ffffff" />
               <ThemedText type="smallBold" style={styles.newTicketText}>
                 New Ticket

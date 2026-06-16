@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
+import { SymbolView } from 'expo-symbols';
 import { ReactNode } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
@@ -11,9 +12,10 @@ export interface ScreenHeaderProps {
   subtitle?: string;
   rightContent?: ReactNode;
   children?: ReactNode; // For custom layout (like Profile)
+  onBackPress?: () => void;
 }
 
-export function ScreenHeader({ title, subtitle, rightContent, children }: ScreenHeaderProps) {
+export function ScreenHeader({ title, subtitle, rightContent, children, onBackPress }: ScreenHeaderProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -29,8 +31,13 @@ export function ScreenHeader({ title, subtitle, rightContent, children }: Screen
 
       {/* Contextual Teal Header */}
       <View style={styles.contextualHeader}>
-        {(title || subtitle || rightContent) && (
+        {(title || subtitle || rightContent || onBackPress) && (
           <View style={styles.headerContent}>
+            {onBackPress && (
+              <Pressable onPress={onBackPress} style={styles.backButton}>
+                <SymbolView name="chevron.left" size={20} tintColor="#ffffff" />
+              </Pressable>
+            )}
             <View style={styles.headerTextContainer}>
               {title && (
                 <ThemedText type="subtitle" style={styles.headerTitle}>
@@ -77,12 +84,15 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
+  },
+  backButton: {
+    marginRight: Spacing.two,
+    padding: Spacing.one,
   },
   headerTextContainer: {
     flex: 1,
