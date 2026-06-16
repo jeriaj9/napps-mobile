@@ -13,6 +13,14 @@ export default function AppTabs() {
       indicatorColor={colors.backgroundElement}
       labelStyle={{ selected: { color: colors.text } }}>
       <NativeTabs.Trigger name="index">
+        <NativeTabs.Trigger.Label>Feed</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon
+          src={require('@/assets/images/tabIcons/feed.png')}
+          renderingMode="template"
+        />
+      </NativeTabs.Trigger>
+
+      <NativeTabs.Trigger name="benefits">
         <NativeTabs.Trigger.Label>Benefits</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon
           src={require('@/assets/images/tabIcons/benefits.png')}
