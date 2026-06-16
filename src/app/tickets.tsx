@@ -1,11 +1,10 @@
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
-import { MetricCard } from '@/components/tickets/metric-card';
 import { TicketCard } from '@/components/tickets/ticket-card';
 import { mockMetrics, mockMyTickets, mockPendingRequests } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -39,29 +38,56 @@ export default function TicketsScreen() {
               </ThemedText>
             </Pressable>
           </View>
-        }>
-        {/* Metrics Row */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.metricsContainer}>
-          <MetricCard title="Total" value={metrics.total} />
-          {metrics.needAttention && (
-            <MetricCard
-              title="Need Attention"
-              value={metrics.needAttention}
-              highlightColor="#D32F2F"
-            />
+        }
+      />
+
+      {/* Metrics Card */}
+      <View style={styles.metricsWrapper}>
+        <View style={[styles.metricsCard, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
+          <View style={styles.metricColumn}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
+              Total
+            </ThemedText>
+            <ThemedText style={[styles.metricValue, { color: theme.text }]}>
+              {metrics.total}
+            </ThemedText>
+          </View>
+
+          {metrics.needAttention !== undefined && (
+            <>
+              <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+              <View style={styles.metricColumn}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle} numberOfLines={1} adjustsFontSizeToFit>
+                  Need Attention
+                </ThemedText>
+                <ThemedText style={[styles.metricValue, { color: '#D32F2F' }]}>
+                  {metrics.needAttention}
+                </ThemedText>
+              </View>
+            </>
           )}
-          <MetricCard
-            title="Open"
-            value={metrics.open}
-            highlightColor="#1976D2"
-            backgroundColor="#E3F2FD"
-          />
-          <MetricCard title="Resolved" value={metrics.resolved} highlightColor="#388E3C" />
-        </ScrollView>
-      </ScreenHeader>
+
+          <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+          <View style={styles.metricColumn}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
+              Open
+            </ThemedText>
+            <ThemedText style={[styles.metricValue, { color: '#1976D2' }]}>
+              {metrics.open}
+            </ThemedText>
+          </View>
+
+          <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+          <View style={styles.metricColumn}>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
+              Resolved
+            </ThemedText>
+            <ThemedText style={[styles.metricValue, { color: '#388E3C' }]}>
+              {metrics.resolved}
+            </ThemedText>
+          </View>
+        </View>
+      </View>
 
       {/* Sticky Content: Search and Tabs */}
       <View style={[styles.stickySection, { backgroundColor: theme.background }]}>
@@ -166,8 +192,41 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.5)',
     borderRadius: Spacing.one,
   },
-  metricsContainer: {
+  metricsWrapper: {
     paddingHorizontal: Spacing.four,
+    paddingBottom: Spacing.two,
+  },
+  metricsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Spacing.two,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingVertical: Spacing.three,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  metricColumn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.one,
+  },
+  metricDivider: {
+    width: StyleSheet.hairlineWidth,
+    height: 24,
+  },
+  metricTitle: {
+    fontSize: 12,
+    textAlign: 'center',
+    marginBottom: Spacing.one,
+  },
+  metricValue: {
+    fontSize: 22,
+    fontWeight: '700',
+    textAlign: 'center',
   },
   stickySection: {
     paddingHorizontal: Spacing.four,
