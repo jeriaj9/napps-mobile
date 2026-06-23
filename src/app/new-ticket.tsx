@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -19,6 +19,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 type TicketType = 'vacation' | 'licence' | 'letter';
 type PriorityType = 'Low' | 'Medium' | 'High';
+
+const PRIORITY_MAP: Record<TicketType, PriorityType> = {
+  vacation: 'Low',
+  licence: 'High',
+  letter: 'Medium',
+};
 
 interface Attachment {
   id: string;
@@ -44,10 +50,15 @@ export default function NewTicketScreen() {
   const [priority, setPriority] = useState<PriorityType>('Low');
   const [message, setMessage] = useState('');
 
+  // Sync priority with ticketType
+  useEffect(() => {
+    setPriority(PRIORITY_MAP[ticketType]);
+  }, [ticketType]);
+
   // Vacation fields
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
-  const [activeDatePicker, setActiveDatePicker] = useState<'start' | 'end' | null>(null);
+  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
 
   // Licence fields
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -136,8 +147,10 @@ export default function NewTicketScreen() {
 
   const handleSelectDay = (day: number) => {
     const formattedDate = `June ${day}, 2026`;
-    if (activeDatePicker === 'start') {
+    
+    if (!startDate || (startDate && endDate)) {
       setStartDate(formattedDate);
+      setEndDate(null);
       if (errors.startDate) {
         setErrors((prev) => {
           const copy = { ...prev };
@@ -146,16 +159,21 @@ export default function NewTicketScreen() {
         });
       }
     } else {
-      setEndDate(formattedDate);
-      if (errors.endDate) {
-        setErrors((prev) => {
-          const copy = { ...prev };
-          delete copy.endDate;
-          return copy;
-        });
+      const startDay = parseInt(startDate.split(' ')[1], 10);
+      if (day < startDay) {
+        setStartDate(formattedDate);
+      } else {
+        setEndDate(formattedDate);
+        if (errors.endDate) {
+          setErrors((prev) => {
+            const copy = { ...prev };
+            delete copy.endDate;
+            return copy;
+          });
+        }
+        setShowDatePickerModal(false);
       }
     }
-    setActiveDatePicker(null);
   };
 
   return (
@@ -301,14 +319,13 @@ export default function NewTicketScreen() {
                   else { activeBg = '#FFEBEE'; activeText = '#D32F2F'; }
                 }
                 return (
-                  <Pressable
+                  <View
                     key={p}
                     style={[
                       styles.priorityButton,
                       { borderColor: theme.backgroundSelected },
-                      isActive && { backgroundColor: activeBg, borderColor: activeText },
-                    ]}
-                    onPress={() => setPriority(p)}>
+                      isActive ? { backgroundColor: activeBg, borderColor: activeText } : { opacity: 0.5 },
+                    ]}>
                     <ThemedText
                       type="smallBold"
                       style={[
@@ -317,7 +334,7 @@ export default function NewTicketScreen() {
                       ]}>
                       {p}
                     </ThemedText>
-                  </Pressable>
+                  </View>
                 );
               })}
             </View>
@@ -354,44 +371,23 @@ export default function NewTicketScreen() {
               Vacation Dates (June 2026)
             </ThemedText>
 
-            <View style={styles.datePickerRow}>
-              {/* Start Date */}
-              <View style={styles.dateFieldWrapper}>
-                <ThemedText type="smallBold" style={styles.inputLabel}>
-                  Start Date
+            <View style={styles.inputGroup}>
+              <ThemedText type="smallBold" style={styles.inputLabel}>
+                Vacation Date Range
+              </ThemedText>
+              <Pressable
+                style={[
+                  styles.dateInputButton,
+                  { borderColor: (errors.startDate || errors.endDate) ? '#D32F2F' : theme.backgroundSelected },
+                ]}
+                onPress={() => setShowDatePickerModal(true)}>
+                <ThemedText style={{ color: (startDate && endDate) ? theme.text : theme.textSecondary }}>
+                  {startDate && endDate ? `${startDate} - ${endDate}` : 'Select Date Range'}
                 </ThemedText>
-                <Pressable
-                  style={[
-                    styles.dateInputButton,
-                    { borderColor: errors.startDate ? '#D32F2F' : theme.backgroundSelected },
-                  ]}
-                  onPress={() => setActiveDatePicker('start')}>
-                  <ThemedText style={{ color: startDate ? theme.text : theme.textSecondary }}>
-                    {startDate || 'Select Date'}
-                  </ThemedText>
-                  <SymbolView name="calendar" size={16} tintColor={theme.textSecondary} />
-                </Pressable>
-                {errors.startDate ? <ThemedText style={styles.errorText}>{errors.startDate}</ThemedText> : null}
-              </View>
-
-              {/* End Date */}
-              <View style={styles.dateFieldWrapper}>
-                <ThemedText type="smallBold" style={styles.inputLabel}>
-                  End Date
-                </ThemedText>
-                <Pressable
-                  style={[
-                    styles.dateInputButton,
-                    { borderColor: errors.endDate ? '#D32F2F' : theme.backgroundSelected },
-                  ]}
-                  onPress={() => setActiveDatePicker('end')}>
-                  <ThemedText style={{ color: endDate ? theme.text : theme.textSecondary }}>
-                    {endDate || 'Select Date'}
-                  </ThemedText>
-                  <SymbolView name="calendar" size={16} tintColor={theme.textSecondary} />
-                </Pressable>
-                {errors.endDate ? <ThemedText style={styles.errorText}>{errors.endDate}</ThemedText> : null}
-              </View>
+                <SymbolView name="calendar" size={18} tintColor={theme.textSecondary} />
+              </Pressable>
+              {errors.startDate ? <ThemedText style={styles.errorText}>{errors.startDate}</ThemedText> : null}
+              {errors.endDate && !errors.startDate ? <ThemedText style={styles.errorText}>{errors.endDate}</ThemedText> : null}
             </View>
           </View>
         )}
@@ -551,33 +547,81 @@ export default function NewTicketScreen() {
 
       {/* Date Picker Modal */}
       <Modal
-        visible={activeDatePicker !== null}
+        visible={showDatePickerModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setActiveDatePicker(null)}>
+        onRequestClose={() => setShowDatePickerModal(false)}>
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
             <View style={styles.modalHeader}>
               <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                Select {activeDatePicker === 'start' ? 'Start' : 'End'} Date
+                Select Vacation Dates
               </ThemedText>
-              <Pressable onPress={() => setActiveDatePicker(null)}>
+              <Pressable onPress={() => setShowDatePickerModal(false)}>
                 <SymbolView name="xmark" size={20} tintColor={theme.text} />
               </Pressable>
             </View>
+
             <ThemedText type="smallBold" themeColor="textSecondary" style={styles.calendarSubheader}>
               June 2026
             </ThemedText>
+
             <View style={styles.calendarGrid}>
-              {juneDays.map((day) => (
-                <Pressable
-                  key={day}
-                  style={styles.calendarDay}
-                  onPress={() => handleSelectDay(day)}>
-                  <ThemedText style={styles.calendarDayText}>{day}</ThemedText>
-                </Pressable>
-              ))}
+              {juneDays.map((day) => {
+                const startDayNum = startDate ? parseInt(startDate.split(' ')[1], 10) : null;
+                const endDayNum = endDate ? parseInt(endDate.split(' ')[1], 10) : null;
+
+                const isStart = startDayNum === day;
+                const isEnd = endDayNum === day;
+                const isSelected = isStart || isEnd;
+                const isInRange = startDayNum && endDayNum && day > startDayNum && day < endDayNum;
+
+                let dayBgColor = 'transparent';
+                let dayTextColor: string = theme.text;
+                let borderRadius: number = Spacing.one;
+
+                if (isSelected) {
+                  dayBgColor = '#1E7C9A';
+                  dayTextColor = '#ffffff';
+                } else if (isInRange) {
+                  dayBgColor = 'rgba(30, 124, 154, 0.15)';
+                  dayTextColor = '#1E7C9A';
+                  borderRadius = 0;
+                }
+
+                return (
+                  <Pressable
+                    key={day}
+                    style={[
+                      styles.calendarDay,
+                      { backgroundColor: dayBgColor, borderRadius },
+                    ]}
+                    onPress={() => handleSelectDay(day)}>
+                    <ThemedText style={{ color: dayTextColor, fontWeight: isSelected ? '700' : '400' }}>
+                      {day}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
             </View>
+
+            {startDate && (
+              <View style={styles.selectedDatesSummary}>
+                <ThemedText type="smallBold">
+                  Selected: {startDate} {endDate ? `to ${endDate}` : '(select end date)'}
+                </ThemedText>
+                {startDate && endDate && (
+                  <Pressable
+                    onPress={() => {
+                      setStartDate(null);
+                      setEndDate(null);
+                    }}
+                    style={styles.clearDatesButton}>
+                    <ThemedText type="smallBold" style={{ color: '#D32F2F' }}>Clear Selection</ThemedText>
+                  </Pressable>
+                )}
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -869,5 +913,17 @@ const styles = StyleSheet.create({
   modalListDetails: {
     flex: 1,
   },
-
+  selectedDatesSummary: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: Spacing.four,
+    paddingTop: Spacing.three,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#E0E1E6',
+  },
+  clearDatesButton: {
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+  },
 });
