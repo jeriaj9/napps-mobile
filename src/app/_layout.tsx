@@ -11,7 +11,7 @@ export default function RootLayout() {
       <AnimatedSplashOverlay />
       <Stack>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="new-ticket" options={{ presentation: 'modal', headerShown: false }} />
+        <Stack.Screen name="new-ticket" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );
