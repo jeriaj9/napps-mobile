@@ -1,6 +1,6 @@
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -15,12 +15,29 @@ export default function TicketsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const theme = useTheme();
+  const { ticketCreated } = useLocalSearchParams<{ ticketCreated?: string }>();
+
   const [activeTab, setActiveTab] = useState<'myTickets' | 'pendingRequests'>('myTickets');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
 
   const isMyTickets = activeTab === 'myTickets';
   const metrics = isMyTickets ? mockMetrics.myTickets : mockMetrics.pendingRequests;
   const ticketsData = isMyTickets ? mockMyTickets : mockPendingRequests;
+
+  useEffect(() => {
+    if (ticketCreated === 'true') {
+      setShowSuccessToast(true);
+
+      const timer = setTimeout(() => {
+        setShowSuccessToast(false);
+        // Clear params to avoid toast popping up again on focus/refresh
+        router.setParams({ ticketCreated: undefined });
+      }, 5000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [ticketCreated]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
@@ -135,6 +152,23 @@ export default function TicketsScreen() {
         renderItem={({ item }) => <TicketCard ticket={item} />}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + Spacing.six }]}
       />
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <View style={[styles.toastContainer, { bottom: insets.bottom + Spacing.four }]}>
+          <View style={[styles.toastContent, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
+            <SymbolView name="checkmark.circle.fill" size={20} tintColor="#388E3C" />
+            <View style={styles.toastTextContainer}>
+              <ThemedText type="smallBold" style={{ fontSize: 13, color: theme.text }}>
+                Ticket Created!
+              </ThemedText>
+              <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, marginTop: 2 }}>
+                Your ticket request has been successfully submitted to Human Resources for review.
+              </ThemedText>
+            </View>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -279,5 +313,30 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
+  },
+  toastContainer: {
+    position: 'absolute',
+    left: Spacing.four,
+    right: Spacing.four,
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  toastContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.three,
+    borderRadius: Spacing.two,
+    borderWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 6,
+    width: '100%',
+    maxWidth: 400,
+    gap: Spacing.three,
+  },
+  toastTextContainer: {
+    flex: 1,
   },
 });

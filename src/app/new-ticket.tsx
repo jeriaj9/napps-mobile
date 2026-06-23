@@ -59,7 +59,6 @@ export default function NewTicketScreen() {
 
   // Submit states
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleSelectMockFile = (file: Attachment) => {
@@ -126,7 +125,8 @@ export default function NewTicketScreen() {
     // Simulate API request
     setTimeout(() => {
       setIsSubmitting(false);
-      setShowSuccessModal(true);
+      // Close the modal and set the success search param on the tickets page
+      router.replace('/(tabs)/tickets?ticketCreated=true');
     }, 1200);
   };
 
@@ -618,32 +618,7 @@ export default function NewTicketScreen() {
         </View>
       </Modal>
 
-      {/* Success Modal */}
-      <Modal visible={showSuccessModal} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={[styles.successModalContainer, { backgroundColor: theme.background }]}>
-            <View style={styles.successIconWrapper}>
-              <SymbolView name="checkmark.circle.fill" size={64} tintColor="#388E3C" />
-            </View>
-            <ThemedText type="subtitle" style={styles.successTitle}>
-              Ticket Created!
-            </ThemedText>
-            <ThemedText type="small" themeColor="textSecondary" style={styles.successSubtitle}>
-              Your ticket request has been successfully submitted to Human Resources for review.
-            </ThemedText>
-            <Pressable
-              style={styles.successButton}
-              onPress={() => {
-                setShowSuccessModal(false);
-                router.back();
-              }}>
-              <ThemedText type="smallBold" style={styles.successButtonText}>
-                Okay
-              </ThemedText>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+
     </View>
   );
 }
@@ -894,36 +869,5 @@ const styles = StyleSheet.create({
   modalListDetails: {
     flex: 1,
   },
-  successModalContainer: {
-    width: '85%',
-    maxWidth: 320,
-    borderRadius: Spacing.three,
-    padding: Spacing.five,
-    alignItems: 'center',
-  },
-  successIconWrapper: {
-    marginBottom: Spacing.three,
-  },
-  successTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    marginBottom: Spacing.two,
-    textAlign: 'center',
-  },
-  successSubtitle: {
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: Spacing.five,
-  },
-  successButton: {
-    backgroundColor: '#388E3C',
-    paddingHorizontal: Spacing.six,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.two,
-    width: '100%',
-    alignItems: 'center',
-  },
-  successButtonText: {
-    color: '#ffffff',
-  },
+
 });
