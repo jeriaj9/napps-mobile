@@ -17,6 +17,31 @@ import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+interface User {
+  id: string;
+  name: string;
+  role: string;
+  initials: string;
+  isHR: boolean;
+}
+
+const USERS = {
+  EMPLOYEE: {
+    id: 'u-1',
+    name: 'Samuel Luis',
+    role: 'Frontend Dev',
+    initials: 'S',
+    isHR: false,
+  },
+  HR: {
+    id: 'u-2',
+    name: 'Ana Sanchez',
+    role: 'HR Manager',
+    initials: 'A',
+    isHR: true,
+  },
+};
+
 interface Comment {
   id: string;
   author: string;
@@ -125,6 +150,9 @@ export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const theme = useTheme();
 
+  // User role state
+  const [currentUser, setCurrentUser] = useState<User>(USERS.EMPLOYEE);
+
   // Feed states
   const [posts, setPosts] = useState<FeedPost[]>(INITIAL_POSTS);
   const [searchQuery, setSearchQuery] = useState('');
@@ -162,9 +190,9 @@ export default function FeedScreen() {
       const newPost: FeedPost = {
         id: `post-${Date.now()}`,
         author: {
-          name: 'Samuel Luis',
-          role: 'Frontend Dev',
-          initials: 'S',
+          name: currentUser.name,
+          role: currentUser.role,
+          initials: currentUser.initials,
         },
         timeAgo: 'Just now',
         content: newPostContent,
@@ -205,9 +233,9 @@ export default function FeedScreen() {
 
     const newComment: Comment = {
       id: `comment-${Date.now()}`,
-      author: 'Samuel Luis',
-      role: 'Frontend Dev',
-      initials: 'S',
+      author: currentUser.name,
+      role: currentUser.role,
+      initials: currentUser.initials,
       content: newCommentText,
       timeAgo: 'Just now',
     };
@@ -337,7 +365,36 @@ export default function FeedScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
       {/* Unified Screen Header */}
-      <ScreenHeader title="Feed" subtitle="What's happening in the company" />
+      <ScreenHeader
+        title="Feed"
+        subtitle="What's happening in the company"
+        rightContent={
+          <Pressable
+            style={styles.userToggleBadge}
+            onPress={() =>
+              setCurrentUser((prev) =>
+                prev.id === USERS.EMPLOYEE.id ? USERS.HR : USERS.EMPLOYEE
+              )
+            }
+          >
+            <View style={styles.headerUserAvatar}>
+              <ThemedText type="smallBold" style={styles.headerUserAvatarText}>
+                {currentUser.initials}
+              </ThemedText>
+            </View>
+            <View style={styles.headerUserInfo}>
+              <ThemedText type="smallBold" style={styles.headerUserName}>
+                {currentUser.name}
+              </ThemedText>
+              <View style={[styles.headerUserRoleBadge, currentUser.isHR ? styles.hrBadge : styles.employeeBadge]}>
+                <ThemedText type="smallBold" style={styles.headerUserRoleText}>
+                  {currentUser.isHR ? 'HR' : 'Employee'}
+                </ThemedText>
+              </View>
+            </View>
+          </Pressable>
+        }
+      />
 
       {/* Main FlatList containing creator card and list elements */}
       <FlatList
@@ -384,7 +441,8 @@ export default function FeedScreen() {
             </View>
 
             {/* Creator Post Card */}
-            <View style={[styles.createPostCard, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
+            {currentUser.isHR && (
+              <View style={[styles.createPostCard, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
               {/* Fake Formatting Toolbar */}
               <View style={[styles.toolbar, { borderBottomColor: theme.backgroundSelected }]}>
                 <Pressable
@@ -482,7 +540,8 @@ export default function FeedScreen() {
                 </Pressable>
               </View>
             </View>
-          </View>
+          )}
+        </View>
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
@@ -652,6 +711,50 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  userToggleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    paddingVertical: Spacing.one,
+    paddingHorizontal: Spacing.two,
+    borderRadius: Spacing.two,
+    gap: Spacing.two,
+  },
+  headerUserAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerUserAvatarText: {
+    color: '#1E7C9A',
+    fontSize: 12,
+  },
+  headerUserInfo: {
+    alignItems: 'flex-start',
+  },
+  headerUserName: {
+    color: '#ffffff',
+    fontSize: 11,
+  },
+  headerUserRoleBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    marginTop: 1,
+  },
+  hrBadge: {
+    backgroundColor: '#4CAF50',
+  },
+  employeeBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  headerUserRoleText: {
+    color: '#ffffff',
+    fontSize: 8,
   },
   listContainer: {
     paddingTop: Spacing.one,
