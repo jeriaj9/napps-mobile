@@ -4,7 +4,7 @@ import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
-import { BenefitCard } from '@/components/benefits/benefit-card';
+import { BenefitCard, BenefitProps } from '@/components/benefits/benefit-card';
 import { ManagementCard } from '@/components/benefits/management-card';
 import { ThemedText } from '@/components/themed-text';
 import {
@@ -23,6 +23,11 @@ export default function BenefitsScreen() {
   // Set default tab to "all" based on reference images being centered there usually, but "enjoying" is fine too.
   const [activeTab, setActiveTab] = useState<TabState>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [allBenefits, setAllBenefits] = useState<BenefitProps[]>(mockAllBenefits);
+
+  const handleDeleteBenefit = (id: string) => {
+    setAllBenefits(allBenefits.filter((benefit) => benefit.id !== id));
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -48,9 +53,14 @@ export default function BenefitsScreen() {
       case 'all':
         return (
           <FlatList
-            data={mockAllBenefits}
+            data={allBenefits}
             keyExtractor={(item) => item.id}
-            renderItem={({ item }) => <BenefitCard benefit={item} />}
+            renderItem={({ item }) => (
+              <BenefitCard
+                benefit={item}
+                onDelete={() => handleDeleteBenefit(item.id)}
+              />
+            )}
             contentContainerStyle={[
               styles.listContent,
               { paddingBottom: insets.bottom + Spacing.six },

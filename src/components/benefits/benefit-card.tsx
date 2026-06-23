@@ -1,5 +1,6 @@
 import { SymbolView } from 'expo-symbols';
-import { StyleSheet, View, Pressable } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import Swipeable from 'react-native-gesture-handler/Swipeable';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -14,10 +15,21 @@ export interface BenefitProps {
   isEnjoying?: boolean; // Used to change the actions for the 'Enjoying' tab
 }
 
-export function BenefitCard({ benefit }: { benefit: BenefitProps }) {
+export function BenefitCard({ benefit, onDelete }: { benefit: BenefitProps; onDelete?: () => void }) {
   const theme = useTheme();
 
-  return (
+  const renderRightActions = () => {
+    if (benefit.isEnjoying || !onDelete) return null;
+
+    return (
+      <Pressable style={styles.deleteAction} onPress={onDelete}>
+        <SymbolView name="trash" size={16} tintColor="#ffffff" />
+        <ThemedText style={styles.deleteActionText}>Delete</ThemedText>
+      </Pressable>
+    );
+  };
+
+  const cardContent = (
     <ThemedView style={styles.card} type="background">
       <View style={styles.contentRow}>
         <View style={[styles.thumbnail, { backgroundColor: '#1E7C9A' }]}>
@@ -42,17 +54,22 @@ export function BenefitCard({ benefit }: { benefit: BenefitProps }) {
             <ThemedText style={styles.activeText}>Active</ThemedText>
           </View>
         ) : (
-          <>
-            <Pressable style={styles.actionButton}>
-              <SymbolView name="pencil" size={14} tintColor="#1976D2" />
-            </Pressable>
-            <Pressable style={styles.actionButton}>
-              <SymbolView name="trash" size={14} tintColor="#D32F2F" />
-            </Pressable>
-          </>
+          <Pressable style={styles.actionButton}>
+            <SymbolView name="pencil" size={14} tintColor="#1976D2" />
+          </Pressable>
         )}
       </View>
     </ThemedView>
+  );
+
+  if (benefit.isEnjoying || !onDelete) {
+    return cardContent;
+  }
+
+  return (
+    <Swipeable renderRightActions={renderRightActions} friction={2} rightThreshold={40}>
+      {cardContent}
+    </Swipeable>
   );
 }
 
@@ -130,5 +147,20 @@ const styles = StyleSheet.create({
     color: '#388E3C',
     fontSize: 10,
     fontWeight: '700',
+  },
+  deleteAction: {
+    backgroundColor: '#D32F2F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: 80,
+    borderRadius: Spacing.three,
+    marginBottom: Spacing.three,
+    marginRight: Spacing.four,
+    gap: 4,
+  },
+  deleteActionText: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });
