@@ -1,126 +1,174 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
-import { TicketCard } from '@/components/tickets/ticket-card';
-import { mockMetrics, mockMyTickets, mockPendingRequests } from '@/constants/mockTicketsData';
+import { TicketCard, TicketProps } from '@/components/tickets/ticket-card';
+import { mockMyTickets, mockPendingRequests, updateTicketStatus } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 export default function TicketsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
   const { ticketCreated } = useLocalSearchParams<{ ticketCreated?: string }>();
 
   const [activeTab, setActiveTab] = useState<'myTickets' | 'pendingRequests'>('myTickets');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
+  const [myTickets, setMyTickets] = useState<TicketProps[]>(mockMyTickets);
+  const [pendingRequests, setPendingRequests] = useState<TicketProps[]>(mockPendingRequests);
+
+  useFocusEffect(
+    useCallback(() => {
+      setMyTickets([...mockMyTickets]);
+      setPendingRequests([...mockPendingRequests]);
+    }, [])
+  );
+
   const isMyTickets = activeTab === 'myTickets';
-  const metrics = isMyTickets ? mockMetrics.myTickets : mockMetrics.pendingRequests;
-  const ticketsData = isMyTickets ? mockMyTickets : mockPendingRequests;
+
+  const handleApprove = (id: string) => {
+    updateTicketStatus(id, 'APPROVED');
+    setPendingRequests([...mockPendingRequests]);
+    setMyTickets([...mockMyTickets]);
+  };
+
+  const handleReject = (id: string) => {
+    updateTicketStatus(id, 'DENIED');
+    setPendingRequests([...mockPendingRequests]);
+    setMyTickets([...mockMyTickets]);
+  };
+
+
+  const getMetrics = () => {
+    const list = isMyTickets ? myTickets : pendingRequests;
+    const total = list.length;
+    const open = list.filter(t => t.status === 'PENDING' || t.status === 'OPEN').length;
+    const resolved = list.filter(t => t.status === 'APPROVED' || t.status === 'RESOLVED').length;
+    const needAttention = isMyTickets
+      ? list.filter(t => t.status === 'DENIED' || t.status === 'IN PROGRESS').length
+      : list.filter(t => t.status === 'PENDING' || t.status === 'OPEN' || t.status === 'IN PROGRESS').length;
+
+    return { total, open, resolved, needAttention };
+  };
+
+  const metrics = getMetrics();
+
+  const getFilteredTickets = () => {
+    const list = isMyTickets ? myTickets : pendingRequests;
+    if (!searchQuery.trim()) return list;
+    const query = searchQuery.toLowerCase();
+    return list.filter(
+      t =>
+        t.id.toLowerCase().includes(query) ||
+        t.requestType.toLowerCase().includes(query) ||
+        (t.description && t.description.toLowerCase().includes(query)) ||
+        (t.employee && t.employee.name.toLowerCase().includes(query))
+    );
+  };
+
+  const ticketsData = getFilteredTickets();
+
 
   useEffect(() => {
     if (ticketCreated === 'true') {
-      setShowSuccessToast(true);
+      const initTimer = setTimeout(() => {
+        setShowSuccessToast(true);
+      }, 0);
 
       const timer = setTimeout(() => {
         setShowSuccessToast(false);
-        // Clear params to avoid toast popping up again on focus/refresh
         router.setParams({ ticketCreated: undefined });
       }, 5000);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(initTimer);
+        clearTimeout(timer);
+      };
     }
-  }, [ticketCreated]);
+  }, [ticketCreated, router]);
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
+    <View style={[styles.container, { backgroundColor: '#F7F8FA' }]}>
       {/* Header */}
       <ScreenHeader
-        title="Ticket System"
-        subtitle="One click, one ticket, one solution"
+        title="Tickets"
+        subtitle="Manage your requests and tickets"
         rightContent={
-          <View style={styles.headerActions}>
-            <Pressable style={styles.newTicketButton} onPress={() => router.push('/new-ticket')}>
-              <SymbolView name="plus" size={14} tintColor="#ffffff" />
-              <ThemedText type="smallBold" style={styles.newTicketText}>
-                New Ticket
-              </ThemedText>
-            </Pressable>
-          </View>
+          <Pressable style={styles.newTicketButton} onPress={() => router.push('/new-ticket')}>
+            <SymbolView name="plus" size={14} tintColor="#ffffff" />
+            <ThemedText type="smallBold" style={styles.newTicketText}>
+              New Ticket
+            </ThemedText>
+          </Pressable>
         }
       />
 
       {/* Metrics Card */}
       <View style={styles.metricsWrapper}>
-        <View style={[styles.metricsCard, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
+        <View style={styles.metricsCard}>
           <View style={styles.metricColumn}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
               Total
             </ThemedText>
-            <ThemedText style={[styles.metricValue, { color: theme.text }]}>
+            <ThemedText style={styles.metricValue}>
               {metrics.total}
             </ThemedText>
           </View>
 
           {metrics.needAttention !== undefined && (
             <>
-              <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+              <View style={styles.metricDivider} />
               <View style={styles.metricColumn}>
                 <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle} numberOfLines={1} adjustsFontSizeToFit>
-                  Need Attention
+                  Attention
                 </ThemedText>
-                <ThemedText style={[styles.metricValue, { color: '#D32F2F' }]}>
+                <ThemedText style={[styles.metricValue, { color: '#FF3B30' }]}>
                   {metrics.needAttention}
                 </ThemedText>
               </View>
             </>
           )}
 
-          <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+          <View style={styles.metricDivider} />
           <View style={styles.metricColumn}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
               Open
             </ThemedText>
-            <ThemedText style={[styles.metricValue, { color: '#1976D2' }]}>
+            <ThemedText style={[styles.metricValue, { color: '#FF9500' }]}>
               {metrics.open}
             </ThemedText>
           </View>
 
-          <View style={[styles.metricDivider, { backgroundColor: theme.backgroundSelected }]} />
+          <View style={styles.metricDivider} />
           <View style={styles.metricColumn}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.metricTitle}>
               Resolved
             </ThemedText>
-            <ThemedText style={[styles.metricValue, { color: '#388E3C' }]}>
+            <ThemedText style={[styles.metricValue, { color: '#1EBD60' }]}>
               {metrics.resolved}
             </ThemedText>
           </View>
         </View>
       </View>
 
-      {/* Sticky Content: Search and Tabs */}
-      <View style={[styles.stickySection, { backgroundColor: theme.background }]}>
+      {/* Search and Tabs */}
+      <View style={styles.stickySection}>
         <View style={styles.searchContainer}>
-          <View style={[styles.searchInputContainer, { backgroundColor: theme.backgroundElement }]}>
-            <SymbolView name="magnifyingglass" size={16} tintColor={theme.textSecondary} />
+          <View style={styles.searchInputContainer}>
+            <SymbolView name="magnifyingglass" size={16} tintColor="#60646C" />
             <TextInput
-              style={[styles.searchInput, { color: theme.text }]}
-              placeholder="Search by ID, type, employee and more..."
-              placeholderTextColor={theme.textSecondary}
+              style={styles.searchInput}
+              placeholder="Search by ID, type..."
+              placeholderTextColor="#9E9E9E"
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
           </View>
-          <Pressable style={styles.filterButton}>
-            <SymbolView name="line.3.horizontal.decrease.circle" size={24} tintColor={theme.text} />
-          </Pressable>
         </View>
 
         <View style={styles.tabsContainer}>
@@ -128,8 +176,7 @@ export default function TicketsScreen() {
             style={[styles.tab, isMyTickets && styles.activeTab]}
             onPress={() => setActiveTab('myTickets')}>
             <ThemedText
-              type="smallBold"
-              style={[styles.tabText, isMyTickets && { color: theme.text }]}>
+              style={[styles.tabText, isMyTickets && styles.activeTabText]}>
               My Tickets
             </ThemedText>
           </Pressable>
@@ -137,33 +184,43 @@ export default function TicketsScreen() {
             style={[styles.tab, !isMyTickets && styles.activeTab]}
             onPress={() => setActiveTab('pendingRequests')}>
             <ThemedText
-              type="smallBold"
-              style={[styles.tabText, !isMyTickets && { color: theme.text }]}>
+              style={[styles.tabText, !isMyTickets && styles.activeTabText]}>
               Pending Requests
             </ThemedText>
           </Pressable>
         </View>
       </View>
 
-      {/* List */}
-      <FlatList
-        data={ticketsData}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <TicketCard ticket={item} />}
-        contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + Spacing.six }]}
-      />
+      {/* Tickets List Container styled as a single Card */}
+      <View style={styles.listWrapper}>
+        <FlatList
+          data={ticketsData}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TicketCard
+              ticket={item}
+              onApprove={!isMyTickets ? () => handleApprove(item.id) : undefined}
+              onReject={!isMyTickets ? () => handleReject(item.id) : undefined}
+            />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          style={styles.flatListCard}
+          contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + Spacing.six + 80 }]}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
 
       {/* Success Toast */}
       {showSuccessToast && (
         <View style={[styles.toastContainer, { bottom: insets.bottom + Spacing.four }]}>
-          <View style={[styles.toastContent, { backgroundColor: theme.backgroundElement, borderColor: theme.backgroundSelected }]}>
-            <SymbolView name="checkmark.circle.fill" size={20} tintColor="#388E3C" />
+          <View style={styles.toastContent}>
+            <SymbolView name="checkmark.circle.fill" size={20} tintColor="#1EBD60" />
             <View style={styles.toastTextContainer}>
-              <ThemedText type="smallBold" style={{ fontSize: 13, color: theme.text }}>
+              <ThemedText type="smallBold" style={{ fontSize: 13, color: '#000000' }}>
                 Ticket Created!
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 11, marginTop: 2 }}>
-                Your ticket request has been successfully submitted to Human Resources for review.
+                Your ticket request has been successfully submitted for review.
               </ThemedText>
             </View>
           </View>
@@ -177,40 +234,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#15395A', // Dark Navy from design
-    paddingBottom: Spacing.four,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    marginBottom: Spacing.five,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  headerTextContainer: {
-    flex: 1,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-  },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-  },
   newTicketButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#26A69A', // Teal button
+    backgroundColor: '#1EBD60',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.one,
@@ -219,26 +246,23 @@ const styles = StyleSheet.create({
   newTicketText: {
     color: '#ffffff',
   },
-  settingsButton: {
-    padding: Spacing.two,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.5)',
-    borderRadius: Spacing.one,
-  },
   metricsWrapper: {
     paddingHorizontal: Spacing.four,
+    paddingTop: Spacing.four,
     paddingBottom: Spacing.two,
   },
   metricsCard: {
     flexDirection: 'row',
     alignItems: 'center',
     borderRadius: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: '#ffffff',
     paddingVertical: Spacing.three,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
     elevation: 1,
   },
   metricColumn: {
@@ -250,29 +274,29 @@ const styles = StyleSheet.create({
   metricDivider: {
     width: StyleSheet.hairlineWidth,
     height: 24,
+    backgroundColor: '#E0E1E6',
   },
   metricTitle: {
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
     marginBottom: Spacing.one,
+    color: '#8E8E93',
+    fontWeight: '600',
   },
   metricValue: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     textAlign: 'center',
+    color: '#000000',
   },
   stickySection: {
     paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E0E1E6',
     zIndex: 1,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.three,
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.three,
   },
   searchInputContainer: {
     flex: 1,
@@ -281,8 +305,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E0E1E6',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: '#ffffff',
     gap: Spacing.two,
   },
   searchInput: {
@@ -290,29 +315,57 @@ const styles = StyleSheet.create({
     height: 24,
     fontSize: 14,
   },
-  filterButton: {
-    padding: Spacing.one,
-  },
   tabsContainer: {
     flexDirection: 'row',
-    gap: Spacing.four,
+    gap: Spacing.six,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E1E6',
+    paddingBottom: 0,
+    marginBottom: Spacing.three,
   },
   tab: {
     paddingBottom: Spacing.two,
-    borderBottomWidth: 2,
+    borderBottomWidth: 3,
     borderBottomColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#15395A', // Underline color
+    borderBottomColor: '#1EBD60',
   },
   tabText: {
-    color: '#9E9E9E', // Inactive text
+    color: '#8E8E93',
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  activeTabText: {
+    color: '#1EBD60',
+    fontWeight: '700',
+  },
+  listWrapper: {
+    flex: 1,
+  },
+  flatListCard: {
+    marginHorizontal: Spacing.four,
+    borderRadius: Spacing.three,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
   },
   listContent: {
-    paddingTop: Spacing.four,
+    paddingTop: 0,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E0E1E6',
+    marginLeft: Spacing.four + 44 + Spacing.three, // Align with description text (margin + icon + gap)
   },
   toastContainer: {
     position: 'absolute',
@@ -327,10 +380,12 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Spacing.two,
     borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
     elevation: 6,
     width: '100%',
     maxWidth: 400,

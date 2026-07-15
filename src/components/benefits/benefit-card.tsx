@@ -5,7 +5,6 @@ import Swipeable from 'react-native-gesture-handler/Swipeable';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 export interface BenefitProps {
   id: string;
@@ -15,8 +14,37 @@ export interface BenefitProps {
   isEnjoying?: boolean; // Used to change the actions for the 'Enjoying' tab
 }
 
-export function BenefitCard({ benefit, onDelete }: { benefit: BenefitProps; onDelete?: () => void }) {
-  const theme = useTheme();
+export function BenefitCard({
+  benefit,
+  onDelete,
+  onRequest,
+}: {
+  benefit: BenefitProps;
+  onDelete?: () => void;
+  onRequest?: () => void;
+}) {
+
+  const getBenefitIcon = (title: string) => {
+    const t = title.toLowerCase();
+    if (t.includes('health') || t.includes('médica') || t.includes('insurance')) {
+      return 'stethoscope';
+    } else if (t.includes('401') || t.includes('retirement') || t.includes('body shop')) {
+      return 'creditcard';
+    } else if (t.includes('wellness') || t.includes('salud')) {
+      return 'heart';
+    } else if (t.includes('life') || t.includes('seguro') || t.includes('vida')) {
+      return 'umbrella';
+    } else if (t.includes('parental') || t.includes('leave') || t.includes('aniversario') || t.includes('fripick')) {
+      return 'face.smiling';
+    } else if (t.includes('gym') || t.includes('membership')) {
+      return 'barbell';
+    } else if (t.includes('courier') || t.includes('discount')) {
+      return 'tag';
+    } else if (t.includes('transportation') || t.includes('transit') || t.includes('car')) {
+      return 'car';
+    }
+    return 'gift';
+  };
 
   const renderRightActions = () => {
     if (benefit.isEnjoying || !onDelete) return null;
@@ -32,32 +60,33 @@ export function BenefitCard({ benefit, onDelete }: { benefit: BenefitProps; onDe
   const cardContent = (
     <ThemedView style={styles.card} type="background">
       <View style={styles.contentRow}>
-        <View style={[styles.thumbnail, { backgroundColor: '#1E7C9A' }]}>
-          <ThemedText style={styles.thumbnailText}>{benefit.thumbnailInitials || 'BE'}</ThemedText>
+        <View style={styles.iconWrapper}>
+          <SymbolView
+            name={getBenefitIcon(benefit.title) as any}
+            size={28}
+            tintColor="#1EBD60"
+          />
         </View>
         <View style={styles.textContainer}>
           <ThemedText style={styles.title}>{benefit.title}</ThemedText>
           <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
             {benefit.description}
           </ThemedText>
-          <Pressable style={styles.learnMore}>
-            <ThemedText type="small" style={styles.learnMoreText}>
-              Learn more{' '}
-            </ThemedText>
-            <SymbolView name="arrow.right" size={10} tintColor={theme.textSecondary} />
-          </Pressable>
+          
+          {benefit.isEnjoying ? (
+            <View style={styles.badgeContainer}>
+              <View style={styles.activeBadge}>
+                <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
+                <ThemedText style={styles.activeText}>Enrolled</ThemedText>
+              </View>
+            </View>
+          ) : (
+            <Pressable style={styles.requestButton} onPress={onRequest}>
+              <SymbolView name="plus" size={12} tintColor="#ffffff" />
+              <ThemedText style={styles.requestButtonText}>Request</ThemedText>
+            </Pressable>
+          )}
         </View>
-      </View>
-      <View style={styles.actionsContainer}>
-        {benefit.isEnjoying ? (
-          <View style={styles.activeBadge}>
-            <ThemedText style={styles.activeText}>Active</ThemedText>
-          </View>
-        ) : (
-          <Pressable style={styles.actionButton}>
-            <SymbolView name="pencil" size={14} tintColor="#1976D2" />
-          </Pressable>
-        )}
       </View>
     </ThemedView>
   );
@@ -82,70 +111,58 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.three,
     marginHorizontal: Spacing.four,
     borderRadius: Spacing.three,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E0E1E6',
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    backgroundColor: '#ffffff',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
     elevation: 2,
   },
   contentRow: {
     flexDirection: 'row',
     flex: 1,
-    gap: Spacing.three,
-    alignItems: 'center',
+    gap: Spacing.four,
+    alignItems: 'flex-start',
   },
-  thumbnail: {
-    width: 50,
-    height: 50,
-    borderRadius: Spacing.two,
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center',
-  },
-  thumbnailText: {
-    color: '#ffffff',
-    fontSize: 16,
-    fontWeight: '600',
   },
   textContainer: {
     flex: 1,
-    gap: 2,
+    gap: 4,
   },
   title: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: '#000000',
   },
   description: {
-    marginBottom: Spacing.one,
-  },
-  learnMore: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  learnMoreText: {
+    fontSize: 13,
+    lineHeight: 18,
     color: '#60646C',
+    marginBottom: 6,
   },
-  actionsContainer: {
+  badgeContainer: {
     flexDirection: 'row',
-    gap: Spacing.two,
-    alignItems: 'center',
-    paddingLeft: Spacing.two,
-  },
-  actionButton: {
-    padding: Spacing.two,
-    backgroundColor: '#F0F0F3',
-    borderRadius: Spacing.one,
   },
   activeBadge: {
     backgroundColor: '#E8F5E9',
     paddingHorizontal: Spacing.two,
     paddingVertical: 4,
     borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   activeText: {
-    color: '#388E3C',
-    fontSize: 10,
+    color: '#1EBD60',
+    fontSize: 11,
     fontWeight: '700',
   },
   deleteAction: {
@@ -162,5 +179,21 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 11,
     fontWeight: '600',
+  },
+  requestButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#1EBD60',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    gap: 4,
+    alignSelf: 'flex-start',
+    marginTop: Spacing.two,
+  },
+  requestButtonText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

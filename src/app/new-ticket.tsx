@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -15,16 +15,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
-type TicketType = 'vacation' | 'licence' | 'letter';
-type PriorityType = 'Low' | 'Medium' | 'High';
-
-const PRIORITY_MAP: Record<TicketType, PriorityType> = {
-  vacation: 'Low',
-  licence: 'High',
-  letter: 'Medium',
-};
+type TicketType = 'vacation' | 'licence' | 'letter' | 'overtime';
 
 interface Attachment {
   id: string;
@@ -34,7 +26,7 @@ interface Attachment {
 
 const MOCK_FILES: Attachment[] = [
   { id: '1', name: 'medical_certificate.jpg', size: '420 KB' },
-  { id: '2', name: 'drivers_license_front.png', size: '310 KB' },
+  { id: '2', name: 'doctors_note_scan.pdf', size: '680 KB' },
   { id: '3', name: 'professional_certification.pdf', size: '1.2 MB' },
   { id: '4', name: 'visa_document_scan.jpg', size: '890 KB' },
 ];
@@ -42,31 +34,32 @@ const MOCK_FILES: Attachment[] = [
 export default function NewTicketScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
+
+  // Navigation step state: 'select' | 'form'
+  const [step, setStep] = useState<'select' | 'form'>('select');
 
   // Shared form states
   const [ticketType, setTicketType] = useState<TicketType>('vacation');
   const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState<PriorityType>('Low');
   const [message, setMessage] = useState('');
-
-  // Sync priority with ticketType
-  useEffect(() => {
-    setPriority(PRIORITY_MAP[ticketType]);
-  }, [ticketType]);
 
   // Vacation fields
   const [startDate, setStartDate] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
   const [showDatePickerModal, setShowDatePickerModal] = useState(false);
+  const [selectingDateType, setSelectingDateType] = useState<'start' | 'end'>('start');
 
-  // Licence fields
+  // Sick Leave (Licence) fields
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [showAttachmentModal, setShowAttachmentModal] = useState(false);
 
   // Letter of Employment fields
   const [purpose, setPurpose] = useState('');
   const [deliveryMethod, setDeliveryMethod] = useState<'digital' | 'printed'>('digital');
+
+  // Overtime fields
+  const [overtimeDate, setOvertimeDate] = useState<string | null>(null);
+  const [overtimeHours, setOvertimeHours] = useState('');
 
   // Submit states
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -77,7 +70,6 @@ export default function NewTicketScreen() {
       setAttachments([...attachments, file]);
     }
     setShowAttachmentModal(false);
-    // Clear attachment error if present
     if (errors.attachments) {
       setErrors((prev) => {
         const copy = { ...prev };
@@ -117,11 +109,18 @@ export default function NewTicketScreen() {
       }
     } else if (ticketType === 'licence') {
       if (attachments.length === 0) {
-        newErrors.attachments = 'At least one license document is required';
+        newErrors.attachments = 'Supporting medical document is required';
       }
     } else if (ticketType === 'letter') {
       if (!purpose.trim()) {
         newErrors.purpose = 'Purpose of the letter is required';
+      }
+    } else if (ticketType === 'overtime') {
+      if (!overtimeDate) {
+        newErrors.overtimeDate = 'Overtime date is required';
+      }
+      if (!overtimeHours.trim()) {
+        newErrors.overtimeHours = 'Hours are required';
       }
     }
 
@@ -133,24 +132,19 @@ export default function NewTicketScreen() {
     if (!validateForm()) return;
 
     setIsSubmitting(true);
-    // Simulate API request
     setTimeout(() => {
       setIsSubmitting(false);
-      // Close the modal and set the success search param on the tickets page
       router.replace('/(tabs)/tickets?ticketCreated=true');
     }, 1200);
   };
 
-  // Custom mock calendar for June 2026
-  // June 1st, 2026 is a Monday. Total days = 30.
   const juneDays = Array.from({ length: 30 }, (_, i) => i + 1);
 
   const handleSelectDay = (day: number) => {
     const formattedDate = `June ${day}, 2026`;
-    
-    if (!startDate || (startDate && endDate)) {
+
+    if (selectingDateType === 'start') {
       setStartDate(formattedDate);
-      setEndDate(null);
       if (errors.startDate) {
         setErrors((prev) => {
           const copy = { ...prev };
@@ -158,200 +152,290 @@ export default function NewTicketScreen() {
           return copy;
         });
       }
+      setShowDatePickerModal(false);
     } else {
-      const startDay = parseInt(startDate.split(' ')[1], 10);
-      if (day < startDay) {
-        setStartDate(formattedDate);
-      } else {
-        setEndDate(formattedDate);
-        if (errors.endDate) {
-          setErrors((prev) => {
-            const copy = { ...prev };
-            delete copy.endDate;
-            return copy;
-          });
-        }
-        setShowDatePickerModal(false);
+      setEndDate(formattedDate);
+      if (errors.endDate) {
+        setErrors((prev) => {
+          const copy = { ...prev };
+          delete copy.endDate;
+          return copy;
+        });
       }
+      setShowDatePickerModal(false);
     }
   };
 
-  return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
-      <ScreenHeader
-        title="Add New Ticket"
-        subtitle="Submit a request to human resources"
-        onBackPress={() => router.back()}
-      />
+  const selectOption = (type: TicketType) => {
+    setTicketType(type);
+    setErrors({});
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: insets.bottom + Spacing.six },
-        ]}
-        showsVerticalScrollIndicator={false}>
-        {/* Ticket Type Selector Card */}
-        <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-            Request Type
-          </ThemedText>
-          <View style={styles.typeSelectorRow}>
-            {/* Vacation */}
-            <Pressable
-              style={[
-                styles.typeOption,
-                { borderColor: theme.backgroundSelected },
-                ticketType === 'vacation' && styles.typeOptionSelected,
-              ]}
-              onPress={() => {
-                setTicketType('vacation');
-                setErrors({});
-              }}>
-              <SymbolView
-                name="calendar"
-                size={22}
-                tintColor={ticketType === 'vacation' ? '#1E7C9A' : theme.textSecondary}
-              />
-              <ThemedText
-                type="smallBold"
-                style={[
-                  styles.typeOptionText,
-                  ticketType === 'vacation' && { color: '#1E7C9A' },
-                ]}>
-                Vacation
-              </ThemedText>
-            </Pressable>
+    // Set default titles for convenience
+    if (type === 'vacation') {
+      setTitle('Request Vacation Days');
+    } else if (type === 'licence') {
+      setTitle('Request Sick Leave');
+    } else if (type === 'overtime') {
+      setTitle('Request Overtime Compensation');
+    } else if (type === 'letter') {
+      setTitle('Request Employment Letter');
+    }
 
-            {/* Licence */}
-            <Pressable
-              style={[
-                styles.typeOption,
-                { borderColor: theme.backgroundSelected },
-                ticketType === 'licence' && styles.typeOptionSelected,
-              ]}
-              onPress={() => {
-                setTicketType('licence');
-                setErrors({});
-              }}>
-              <SymbolView
-                name="doc.text"
-                size={22}
-                tintColor={ticketType === 'licence' ? '#1E7C9A' : theme.textSecondary}
-              />
-              <ThemedText
-                type="smallBold"
-                style={[
-                  styles.typeOptionText,
-                  ticketType === 'licence' && { color: '#1E7C9A' },
-                ]}>
-                Licence
-              </ThemedText>
-            </Pressable>
+    setStep('form');
+  };
 
-            {/* Letter */}
-            <Pressable
-              style={[
-                styles.typeOption,
-                { borderColor: theme.backgroundSelected },
-                ticketType === 'letter' && styles.typeOptionSelected,
-              ]}
-              onPress={() => {
-                setTicketType('letter');
-                setErrors({});
-              }}>
-              <SymbolView
-                name="envelope"
-                size={22}
-                tintColor={ticketType === 'letter' ? '#1E7C9A' : theme.textSecondary}
-              />
-              <ThemedText
-                type="smallBold"
-                style={[
-                  styles.typeOptionText,
-                  ticketType === 'letter' && { color: '#1E7C9A' },
-                ]}>
-                Employment Letter
-              </ThemedText>
-            </Pressable>
-          </View>
+  const renderSelectStep = () => {
+    return (
+      <View style={styles.stepContainer}>
+        <ScreenHeader
+          title="New Request"
+          onBackPress={() => router.back()}
+        />
+        <View style={styles.selectHeader}>
+          <ThemedText style={styles.selectHeaderText}>Select a request type to get started</ThemedText>
         </View>
 
-        {/* Core Form Card */}
-        <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
-          <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-            Ticket Information
-          </ThemedText>
-
-          {/* Title input */}
-          <View style={styles.inputGroup}>
-            <ThemedText type="smallBold" style={styles.inputLabel}>
-              Title
-            </ThemedText>
-            <TextInput
-              style={[
-                styles.textInput,
-                { color: theme.text, borderColor: errors.title ? '#D32F2F' : theme.backgroundSelected },
-              ]}
-              placeholder="e.g., Summer vacation request"
-              placeholderTextColor={theme.textSecondary}
-              value={title}
-              onChangeText={(text) => {
-                setTitle(text);
-                if (errors.title) setErrors((prev) => ({ ...prev, title: '' }));
-              }}
-            />
-            {errors.title ? <ThemedText style={styles.errorText}>{errors.title}</ThemedText> : null}
-          </View>
-
-          {/* Priority Selection */}
-          <View style={styles.inputGroup}>
-            <ThemedText type="smallBold" style={styles.inputLabel}>
-              Priority
-            </ThemedText>
-            <View style={styles.priorityRow}>
-              {(['Low', 'Medium', 'High'] as PriorityType[]).map((p) => {
-                const isActive = priority === p;
-                let activeBg: string = theme.backgroundSelected;
-                let activeText: string = theme.text;
-                if (isActive) {
-                  if (p === 'Low') { activeBg = '#E8F5E9'; activeText = '#388E3C'; }
-                  else if (p === 'Medium') { activeBg = '#FFF3E0'; activeText = '#F57C00'; }
-                  else { activeBg = '#FFEBEE'; activeText = '#D32F2F'; }
-                }
-                return (
-                  <View
-                    key={p}
-                    style={[
-                      styles.priorityButton,
-                      { borderColor: theme.backgroundSelected },
-                      isActive ? { backgroundColor: activeBg, borderColor: activeText } : { opacity: 0.5 },
-                    ]}>
-                    <ThemedText
-                      type="smallBold"
-                      style={[
-                        { color: theme.textSecondary },
-                        isActive && { color: activeText },
-                      ]}>
-                      {p}
-                    </ThemedText>
-                  </View>
-                );
-              })}
+        <View style={styles.optionsCard}>
+          {/* Vacation Days */}
+          <Pressable style={styles.optionRow} onPress={() => selectOption('vacation')}>
+            <View style={[styles.optionIconWrapper, { backgroundColor: '#E8F5E9' }]}>
+              <SymbolView name="calendar" size={22} tintColor="#1EBD60" />
             </View>
-          </View>
+            <View style={styles.optionTextWrapper}>
+              <ThemedText style={styles.optionTitle}>Vacation Days</ThemedText>
+              <ThemedText style={styles.optionDesc}>Request time off for vacation</ThemedText>
+            </View>
+            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
+          </Pressable>
 
-          {/* Description */}
-          <View style={styles.inputGroup}>
-            <ThemedText type="smallBold" style={styles.inputLabel}>
-              Message / Description
-            </ThemedText>
+          <View style={styles.optionDivider} />
+
+          {/* Sick Leave */}
+          <Pressable style={styles.optionRow} onPress={() => selectOption('licence')}>
+            <View style={[styles.optionIconWrapper, { backgroundColor: '#FFEBEE' }]}>
+              <SymbolView name="heart" size={20} tintColor="#FF3B30" />
+            </View>
+            <View style={styles.optionTextWrapper}>
+              <ThemedText style={styles.optionTitle}>Sick Leave</ThemedText>
+              <ThemedText style={styles.optionDesc}>Report sick leave absence</ThemedText>
+            </View>
+            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
+          </Pressable>
+
+          <View style={styles.optionDivider} />
+
+          {/* Overtime */}
+          <Pressable style={styles.optionRow} onPress={() => selectOption('overtime')}>
+            <View style={[styles.optionIconWrapper, { backgroundColor: '#FFF3E0' }]}>
+              <SymbolView name="clock" size={20} tintColor="#FF9500" />
+            </View>
+            <View style={styles.optionTextWrapper}>
+              <ThemedText style={styles.optionTitle}>Overtime</ThemedText>
+              <ThemedText style={styles.optionDesc}>Request overtime compensation</ThemedText>
+            </View>
+            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
+          </Pressable>
+
+          <View style={styles.optionDivider} />
+
+          {/* Company Letter */}
+          <Pressable style={styles.optionRow} onPress={() => selectOption('letter')}>
+            <View style={[styles.optionIconWrapper, { backgroundColor: '#E3F2FD' }]}>
+              <SymbolView name="doc.text" size={20} tintColor="#007AFF" />
+            </View>
+            <View style={styles.optionTextWrapper}>
+              <ThemedText style={styles.optionTitle}>Company Letter</ThemedText>
+              <ThemedText style={styles.optionDesc}>Request official company letter</ThemedText>
+            </View>
+            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
+          </Pressable>
+        </View>
+      </View>
+    );
+  };
+
+  const getFormTitle = () => {
+    switch (ticketType) {
+      case 'vacation': return 'Request Vacation Days';
+      case 'licence': return 'Request Sick Leave';
+      case 'overtime': return 'Request Overtime';
+      case 'letter': return 'Request Company Letter';
+    }
+  };
+
+  const renderFormStep = () => {
+    return (
+      <View style={styles.stepContainer}>
+        <ScreenHeader
+          title={getFormTitle()}
+          onBackPress={() => setStep('select')}
+        />
+
+        <ScrollView
+          contentContainerStyle={[styles.formScrollContent, { paddingBottom: insets.bottom + Spacing.six }]}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Vacation Days Available Circular Progress Gauge */}
+          {ticketType === 'vacation' && (
+            <View style={styles.gaugeContainer}>
+              <View style={styles.gaugeCircle}>
+                <ThemedText style={styles.gaugeNumber}>12</ThemedText>
+                <ThemedText style={styles.gaugeLabel}>DAYS AVAILABLE</ThemedText>
+              </View>
+              <View style={styles.gaugeStatsRow}>
+                <ThemedText style={styles.gaugeStatText}>Used this year</ThemedText>
+                <ThemedText style={styles.gaugeStatValue}>8 days</ThemedText>
+              </View>
+              <View style={styles.gaugeStatsDivider} />
+              <View style={styles.gaugeStatsRow}>
+                <ThemedText style={styles.gaugeStatText}>Total allocation</ThemedText>
+                <ThemedText style={styles.gaugeStatValue}>20 days</ThemedText>
+              </View>
+            </View>
+          )}
+
+          {/* Form Content Card */}
+          <View style={styles.formCard}>
+            {/* Vacation Dates selection fields */}
+            {ticketType === 'vacation' && (
+              <View style={styles.formSection}>
+                <ThemedText style={styles.inputLabel}>FROM</ThemedText>
+                <Pressable
+                  style={[styles.dateInputButton, errors.startDate && styles.inputErrorBorder]}
+                  onPress={() => {
+                    setSelectingDateType('start');
+                    setShowDatePickerModal(true);
+                  }}
+                >
+                  <ThemedText style={[styles.dateInputText, !startDate && { color: '#9E9E9E' }]}>
+                    {startDate || 'mm/dd/yyyy'}
+                  </ThemedText>
+                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
+                </Pressable>
+                {errors.startDate ? <ThemedText style={styles.errorText}>{errors.startDate}</ThemedText> : null}
+
+                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>TO</ThemedText>
+                <Pressable
+                  style={[styles.dateInputButton, errors.endDate && styles.inputErrorBorder]}
+                  onPress={() => {
+                    setSelectingDateType('end');
+                    setShowDatePickerModal(true);
+                  }}
+                >
+                  <ThemedText style={[styles.dateInputText, !endDate && { color: '#9E9E9E' }]}>
+                    {endDate || 'mm/dd/yyyy'}
+                  </ThemedText>
+                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
+                </Pressable>
+                {errors.endDate ? <ThemedText style={styles.errorText}>{errors.endDate}</ThemedText> : null}
+              </View>
+            )}
+
+            {/* Sick Leave / Attachment upload fields */}
+            {ticketType === 'licence' && (
+              <View style={styles.formSection}>
+                <ThemedText style={styles.inputLabel}>MEDICAL CERTIFICATE / DOCUMENT</ThemedText>
+                {attachments.map((file) => (
+                  <View key={file.id} style={styles.attachmentItem}>
+                    <SymbolView name="doc.text" size={18} tintColor="#8E8E93" />
+                    <View style={styles.attachmentDetails}>
+                      <ThemedText style={styles.attachmentName}>{file.name}</ThemedText>
+                      <ThemedText style={styles.attachmentSize}>{file.size}</ThemedText>
+                    </View>
+                    <Pressable style={styles.removeAttachmentBtn} onPress={() => handleRemoveAttachment(file.id)}>
+                      <SymbolView name="xmark.circle.fill" size={18} tintColor="#FF3B30" />
+                    </Pressable>
+                  </View>
+                ))}
+
+                <Pressable
+                  style={[styles.uploadButton, errors.attachments && styles.inputErrorBorder]}
+                  onPress={() => setShowAttachmentModal(true)}
+                >
+                  <SymbolView name="plus" size={14} tintColor="#1EBD60" />
+                  <ThemedText style={styles.uploadButtonText}>Upload document</ThemedText>
+                </Pressable>
+                {errors.attachments ? <ThemedText style={styles.errorText}>{errors.attachments}</ThemedText> : null}
+              </View>
+            )}
+
+            {/* Overtime hours / date fields */}
+            {ticketType === 'overtime' && (
+              <View style={styles.formSection}>
+                <ThemedText style={styles.inputLabel}>OVERTIME DATE</ThemedText>
+                <Pressable
+                  style={[styles.dateInputButton, errors.overtimeDate && styles.inputErrorBorder]}
+                  onPress={() => {
+                    setSelectingDateType('start'); // reutilizamos modal de junio
+                    setShowDatePickerModal(true);
+                  }}
+                >
+                  <ThemedText style={[styles.dateInputText, !overtimeDate && { color: '#9E9E9E' }]}>
+                    {startDate || 'Select Date'}
+                  </ThemedText>
+                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
+                </Pressable>
+                {errors.overtimeDate ? <ThemedText style={styles.errorText}>{errors.overtimeDate}</ThemedText> : null}
+
+                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>HOURS WORKED</ThemedText>
+                <TextInput
+                  style={[styles.textInput, errors.overtimeHours && styles.inputErrorBorder]}
+                  placeholder="e.g. 4.5"
+                  placeholderTextColor="#9E9E9E"
+                  keyboardType="numeric"
+                  value={overtimeHours}
+                  onChangeText={(text) => {
+                    setOvertimeHours(text);
+                    if (errors.overtimeHours) setErrors((prev) => ({ ...prev, overtimeHours: '' }));
+                  }}
+                />
+                {errors.overtimeHours ? <ThemedText style={styles.errorText}>{errors.overtimeHours}</ThemedText> : null}
+              </View>
+            )}
+
+            {/* Company Letter purpose / delivery fields */}
+            {ticketType === 'letter' && (
+              <View style={styles.formSection}>
+                <ThemedText style={styles.inputLabel}>PURPOSE OF LETTER</ThemedText>
+                <TextInput
+                  style={[styles.textInput, errors.purpose && styles.inputErrorBorder]}
+                  placeholder="e.g. Bank Loan, Visa Application"
+                  placeholderTextColor="#9E9E9E"
+                  value={purpose}
+                  onChangeText={(text) => {
+                    setPurpose(text);
+                    if (errors.purpose) setErrors((prev) => ({ ...prev, purpose: '' }));
+                  }}
+                />
+                {errors.purpose ? <ThemedText style={styles.errorText}>{errors.purpose}</ThemedText> : null}
+
+                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>DELIVERY FORMAT</ThemedText>
+                <View style={styles.deliverySelector}>
+                  <Pressable
+                    style={[styles.deliveryOption, deliveryMethod === 'digital' && styles.deliveryOptionActive]}
+                    onPress={() => setDeliveryMethod('digital')}
+                  >
+                    <SymbolView name="paperplane" size={16} tintColor={deliveryMethod === 'digital' ? '#1EBD60' : '#8E8E93'} />
+                    <ThemedText style={[styles.deliveryText, deliveryMethod === 'digital' && { color: '#1EBD60' }]}>Digital PDF (Email)</ThemedText>
+                  </Pressable>
+
+                  <Pressable
+                    style={[styles.deliveryOption, deliveryMethod === 'printed' && styles.deliveryOptionActive]}
+                    onPress={() => setDeliveryMethod('printed')}
+                  >
+                    <SymbolView name="printer" size={16} tintColor={deliveryMethod === 'printed' ? '#1EBD60' : '#8E8E93'} />
+                    <ThemedText style={[styles.deliveryText, deliveryMethod === 'printed' && { color: '#1EBD60' }]}>Printed copy (HR)</ThemedText>
+                  </Pressable>
+                </View>
+              </View>
+            )}
+
+            {/* Description/Message input */}
+            <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>REASON (OPTIONAL)</ThemedText>
             <TextInput
-              style={[
-                styles.textArea,
-                { color: theme.text, borderColor: errors.message ? '#D32F2F' : theme.backgroundSelected },
-              ]}
-              placeholder="Describe your request in detail..."
-              placeholderTextColor={theme.textSecondary}
+              style={[styles.textArea, errors.message && styles.inputErrorBorder]}
+              placeholder="Add any notes about your request..."
+              placeholderTextColor="#9E9E9E"
               multiline
               numberOfLines={4}
               value={message}
@@ -361,267 +445,79 @@ export default function NewTicketScreen() {
               }}
             />
             {errors.message ? <ThemedText style={styles.errorText}>{errors.message}</ThemedText> : null}
-          </View>
-        </View>
 
-        {/* Dynamic Context Card */}
-        {ticketType === 'vacation' && (
-          <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-              Vacation Dates (June 2026)
-            </ThemedText>
-
-            <View style={styles.inputGroup}>
-              <ThemedText type="smallBold" style={styles.inputLabel}>
-                Vacation Date Range
-              </ThemedText>
-              <Pressable
-                style={[
-                  styles.dateInputButton,
-                  { borderColor: (errors.startDate || errors.endDate) ? '#D32F2F' : theme.backgroundSelected },
-                ]}
-                onPress={() => setShowDatePickerModal(true)}>
-                <ThemedText style={{ color: (startDate && endDate) ? theme.text : theme.textSecondary }}>
-                  {startDate && endDate ? `${startDate} - ${endDate}` : 'Select Date Range'}
-                </ThemedText>
-                <SymbolView name="calendar" size={18} tintColor={theme.textSecondary} />
-              </Pressable>
-              {errors.startDate ? <ThemedText style={styles.errorText}>{errors.startDate}</ThemedText> : null}
-              {errors.endDate && !errors.startDate ? <ThemedText style={styles.errorText}>{errors.endDate}</ThemedText> : null}
-            </View>
-          </View>
-        )}
-
-        {ticketType === 'licence' && (
-          <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-              License Verification File
-            </ThemedText>
-
-            {/* Attachments Section */}
-            {attachments.length > 0 && (
-              <View style={styles.attachmentsList}>
-                {attachments.map((file) => (
-                  <View
-                    key={file.id}
-                    style={[styles.attachmentItem, { borderColor: theme.backgroundSelected }]}>
-                    <SymbolView name="doc.text" size={18} tintColor={theme.textSecondary} />
-                    <View style={styles.attachmentDetails}>
-                      <ThemedText type="smallBold" style={styles.attachmentName}>
-                        {file.name}
-                      </ThemedText>
-                      <ThemedText type="small" themeColor="textSecondary">
-                        {file.size}
-                      </ThemedText>
-                    </View>
-                    <Pressable
-                      style={styles.removeButton}
-                      onPress={() => handleRemoveAttachment(file.id)}>
-                      <SymbolView name="xmark.circle.fill" size={18} tintColor="#D32F2F" />
-                    </Pressable>
-                  </View>
-                ))}
-              </View>
-            )}
-
+            {/* Submit Actions */}
             <Pressable
-              style={[
-                styles.uploadButton,
-                { borderColor: errors.attachments ? '#D32F2F' : '#1E7C9A' },
-              ]}
-              onPress={() => setShowAttachmentModal(true)}>
-              <SymbolView name="plus" size={14} tintColor="#1E7C9A" />
-              <ThemedText type="smallBold" style={styles.uploadButtonText}>
-                Add Attachment
-              </ThemedText>
+              style={[styles.btnSubmit, isSubmitting && styles.btnSubmitDisabled]}
+              disabled={isSubmitting}
+              onPress={handleSubmit}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <ThemedText type="smallBold" style={styles.btnSubmitText}>
+                  Submit Request
+                </ThemedText>
+              )}
             </Pressable>
-            {errors.attachments ? <ThemedText style={styles.errorText}>{errors.attachments}</ThemedText> : null}
-          </View>
-        )}
 
-        {ticketType === 'letter' && (
-          <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.backgroundSelected }]}>
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.sectionTitle}>
-              Letter of Employment Details
+            {/* Supervisor review notice */}
+            <ThemedText style={styles.formNoticeText}>
+              Your supervisor will review this request and notify you of the decision.
             </ThemedText>
-
-            {/* Purpose input */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="smallBold" style={styles.inputLabel}>
-                Purpose of Letter
-              </ThemedText>
-              <TextInput
-                style={[
-                  styles.textInput,
-                  { color: theme.text, borderColor: errors.purpose ? '#D32F2F' : theme.backgroundSelected },
-                ]}
-                placeholder="e.g., Bank Loan, Visa Application"
-                placeholderTextColor={theme.textSecondary}
-                value={purpose}
-                onChangeText={(text) => {
-                  setPurpose(text);
-                  if (errors.purpose) setErrors((prev) => ({ ...prev, purpose: '' }));
-                }}
-              />
-              {errors.purpose ? <ThemedText style={styles.errorText}>{errors.purpose}</ThemedText> : null}
-            </View>
-
-            {/* Delivery Method */}
-            <View style={styles.inputGroup}>
-              <ThemedText type="smallBold" style={styles.inputLabel}>
-                Delivery Format
-              </ThemedText>
-              <View style={styles.deliverySelector}>
-                <Pressable
-                  style={[
-                    styles.deliveryOption,
-                    { borderColor: theme.backgroundSelected },
-                    deliveryMethod === 'digital' && styles.deliveryOptionActive,
-                  ]}
-                  onPress={() => setDeliveryMethod('digital')}>
-                  <SymbolView
-                    name="paperplane"
-                    size={16}
-                    tintColor={deliveryMethod === 'digital' ? '#1E7C9A' : theme.textSecondary}
-                  />
-                  <ThemedText
-                    type="smallBold"
-                    style={[
-                      styles.deliveryOptionText,
-                      deliveryMethod === 'digital' && { color: '#1E7C9A' },
-                    ]}>
-                    Digital PDF (Email)
-                  </ThemedText>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.deliveryOption,
-                    { borderColor: theme.backgroundSelected },
-                    deliveryMethod === 'printed' && styles.deliveryOptionActive,
-                  ]}
-                  onPress={() => setDeliveryMethod('printed')}>
-                  <SymbolView
-                    name="printer"
-                    size={16}
-                    tintColor={deliveryMethod === 'printed' ? '#1E7C9A' : theme.textSecondary}
-                  />
-                  <ThemedText
-                    type="smallBold"
-                    style={[
-                      styles.deliveryOptionText,
-                      deliveryMethod === 'printed' && { color: '#1E7C9A' },
-                    ]}>
-                    Printed copy (HR)
-                  </ThemedText>
-                </Pressable>
-              </View>
-            </View>
           </View>
-        )}
+        </ScrollView>
+      </View>
+    );
+  };
 
-        {/* Submit Actions */}
-        <View style={styles.actionRow}>
-          <Pressable
-            style={[styles.btnCancel, { borderColor: theme.backgroundSelected }]}
-            onPress={() => router.back()}>
-            <ThemedText type="smallBold" themeColor="textSecondary">
-              Cancel
-            </ThemedText>
-          </Pressable>
-
-          <Pressable
-            style={styles.btnSubmit}
-            disabled={isSubmitting}
-            onPress={handleSubmit}>
-            {isSubmitting ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <ThemedText type="smallBold" style={styles.btnSubmitText}>
-                Submit Request
-              </ThemedText>
-            )}
-          </Pressable>
-        </View>
-      </ScrollView>
+  return (
+    <View style={[styles.container, { backgroundColor: '#F7F8FA' }]}>
+      {step === 'select' ? renderSelectStep() : renderFormStep()}
 
       {/* Date Picker Modal */}
       <Modal
         visible={showDatePickerModal}
         transparent
         animationType="fade"
-        onRequestClose={() => setShowDatePickerModal(false)}>
+        onRequestClose={() => setShowDatePickerModal(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                Select Vacation Dates
-              </ThemedText>
+              <ThemedText style={styles.modalTitle}>Select Date (June 2026)</ThemedText>
               <Pressable onPress={() => setShowDatePickerModal(false)}>
-                <SymbolView name="xmark" size={20} tintColor={theme.text} />
+                <SymbolView name="xmark" size={20} tintColor="#000000" />
               </Pressable>
             </View>
 
-            <ThemedText type="smallBold" themeColor="textSecondary" style={styles.calendarSubheader}>
-              June 2026
-            </ThemedText>
+            <ThemedText style={styles.calendarSubheader}>June 2026</ThemedText>
 
             <View style={styles.calendarGrid}>
               {juneDays.map((day) => {
-                const startDayNum = startDate ? parseInt(startDate.split(' ')[1], 10) : null;
-                const endDayNum = endDate ? parseInt(endDate.split(' ')[1], 10) : null;
-
-                const isStart = startDayNum === day;
-                const isEnd = endDayNum === day;
-                const isSelected = isStart || isEnd;
-                const isInRange = startDayNum && endDayNum && day > startDayNum && day < endDayNum;
-
-                let dayBgColor = 'transparent';
-                let dayTextColor: string = theme.text;
-                let borderRadius: number = Spacing.one;
-
-                if (isSelected) {
-                  dayBgColor = '#1E7C9A';
-                  dayTextColor = '#ffffff';
-                } else if (isInRange) {
-                  dayBgColor = 'rgba(30, 124, 154, 0.15)';
-                  dayTextColor = '#1E7C9A';
-                  borderRadius = 0;
-                }
+                const isSelected = selectingDateType === 'start'
+                  ? startDate === `June ${day}, 2026`
+                  : endDate === `June ${day}, 2026`;
 
                 return (
                   <Pressable
                     key={day}
-                    style={[
-                      styles.calendarDay,
-                      { backgroundColor: dayBgColor, borderRadius },
-                    ]}
-                    onPress={() => handleSelectDay(day)}>
-                    <ThemedText style={{ color: dayTextColor, fontWeight: isSelected ? '700' : '400' }}>
+                    style={[styles.calendarDay, isSelected && styles.calendarDaySelected]}
+                    onPress={() => {
+                      if (ticketType === 'overtime') {
+                        setOvertimeDate(`June ${day}, 2026`);
+                        setStartDate(`June ${day}, 2026`);
+                      }
+                      handleSelectDay(day);
+                    }}
+                  >
+                    <ThemedText style={[styles.calendarDayText, isSelected && { color: '#ffffff', fontWeight: '700' }]}>
                       {day}
                     </ThemedText>
                   </Pressable>
                 );
               })}
             </View>
-
-            {startDate && (
-              <View style={styles.selectedDatesSummary}>
-                <ThemedText type="smallBold">
-                  Selected: {startDate} {endDate ? `to ${endDate}` : '(select end date)'}
-                </ThemedText>
-                {startDate && endDate && (
-                  <Pressable
-                    onPress={() => {
-                      setStartDate(null);
-                      setEndDate(null);
-                    }}
-                    style={styles.clearDatesButton}>
-                    <ThemedText type="smallBold" style={{ color: '#D32F2F' }}>Clear Selection</ThemedText>
-                  </Pressable>
-                )}
-              </View>
-            )}
           </View>
         </View>
       </Modal>
@@ -631,29 +527,27 @@ export default function NewTicketScreen() {
         visible={showAttachmentModal}
         transparent
         animationType="slide"
-        onRequestClose={() => setShowAttachmentModal(false)}>
+        onRequestClose={() => setShowAttachmentModal(false)}
+      >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <ThemedText type="smallBold" style={{ fontSize: 16 }}>
-                Choose Document to Upload
-              </ThemedText>
+              <ThemedText style={styles.modalTitle}>Choose Document to Upload</ThemedText>
               <Pressable onPress={() => setShowAttachmentModal(false)}>
-                <SymbolView name="xmark" size={20} tintColor={theme.text} />
+                <SymbolView name="xmark" size={20} tintColor="#000000" />
               </Pressable>
             </View>
             <View style={styles.modalList}>
               {MOCK_FILES.map((file) => (
                 <Pressable
                   key={file.id}
-                  style={[styles.modalListItem, { borderColor: theme.backgroundSelected }]}
-                  onPress={() => handleSelectMockFile(file)}>
-                  <SymbolView name="doc.fill" size={20} tintColor="#1E7C9A" />
+                  style={styles.modalListItem}
+                  onPress={() => handleSelectMockFile(file)}
+                >
+                  <SymbolView name="doc.fill" size={20} tintColor="#1EBD60" />
                   <View style={styles.modalListDetails}>
                     <ThemedText type="smallBold">{file.name}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">
-                      {file.size}
-                    </ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">{file.size}</ThemedText>
                   </View>
                 </Pressable>
               ))}
@@ -661,8 +555,6 @@ export default function NewTicketScreen() {
           </View>
         </View>
       </Modal>
-
-
     </View>
   );
 }
@@ -671,91 +563,157 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    paddingTop: Spacing.one,
+  stepContainer: {
+    flex: 1,
+  },
+  selectHeader: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.five,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
   },
-  card: {
-    marginHorizontal: Spacing.four,
-    marginBottom: Spacing.four,
-    padding: Spacing.four,
-    borderRadius: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  sectionTitle: {
-    marginBottom: Spacing.three,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  typeSelectorRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  typeOption: {
-    flex: 1,
-    paddingVertical: Spacing.three,
-    alignItems: 'center',
-    borderRadius: Spacing.two,
-    borderWidth: 1,
-    gap: Spacing.one,
-  },
-  typeOptionSelected: {
-    borderColor: '#1E7C9A',
-    backgroundColor: 'rgba(30, 124, 154, 0.08)',
-  },
-  typeOptionText: {
-    fontSize: 11,
+  selectHeaderText: {
+    fontSize: 16,
     color: '#60646C',
-    textAlign: 'center',
+    fontWeight: '600',
   },
-  inputGroup: {
-    marginBottom: Spacing.four,
-  },
-  inputLabel: {
-    fontSize: 13,
-    marginBottom: Spacing.two,
-  },
-  textInput: {
-    height: 48,
+  optionsCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: Spacing.three,
     borderWidth: 1,
-    borderRadius: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    fontSize: 14,
+    borderColor: '#EFEFEF',
+    marginHorizontal: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+    overflow: 'hidden',
   },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: Spacing.one,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    fontSize: 14,
-    height: 100,
-    textAlignVertical: 'top',
-  },
-  priorityRow: {
+  optionRow: {
     flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  priorityButton: {
-    flex: 1,
-    height: 40,
     alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Spacing.one,
-    borderWidth: 1,
-  },
-  datePickerRow: {
-    flexDirection: 'row',
+    padding: Spacing.four,
     gap: Spacing.three,
   },
-  dateFieldWrapper: {
+  optionIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionTextWrapper: {
     flex: 1,
+    gap: 2,
+  },
+  optionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  optionDesc: {
+    fontSize: 13,
+    color: '#8E8E93',
+  },
+  optionDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E0E1E6',
+    marginLeft: Spacing.four + 44 + Spacing.three,
+  },
+  formScrollContent: {
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+    paddingTop: Spacing.three,
+  },
+  gaugeContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#ffffff',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    marginHorizontal: Spacing.four,
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+    marginBottom: Spacing.four,
+  },
+  gaugeCircle: {
+    width: 160,
+    height: 160,
+    borderRadius: 80,
+    borderWidth: 9,
+    borderColor: '#EFEFEF',
+    borderTopColor: '#1EBD60',
+    borderRightColor: '#1EBD60',
+    borderBottomColor: '#1EBD60',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transform: [{ rotate: '45deg' }],
+    marginVertical: Spacing.three,
+  },
+  gaugeNumber: {
+    fontSize: 32,
+    paddingTop: 8,
+    fontWeight: '800',
+    color: '#000000',
+    transform: [{ rotate: '-45deg' }], // rotate text back
+  },
+  gaugeLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#8E8E93',
+    marginTop: 2,
+    transform: [{ rotate: '-45deg' }], // rotate text back
+  },
+  gaugeStatsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: 10,
+    paddingHorizontal: Spacing.two,
+  },
+  gaugeStatText: {
+    fontSize: 14,
+    color: '#60646C',
+  },
+  gaugeStatValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  gaugeStatsDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E0E1E6',
+    width: '100%',
+  },
+  formCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    marginHorizontal: Spacing.four,
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  formSection: {
+    gap: 1,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    marginBottom: Spacing.two,
   },
   dateInputButton: {
     flexDirection: 'row',
@@ -763,8 +721,67 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     height: 48,
     borderWidth: 1,
-    borderRadius: Spacing.one,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
     paddingHorizontal: Spacing.three,
+    backgroundColor: '#F7F8FA',
+  },
+  dateInputText: {
+    fontSize: 15,
+    color: '#000000',
+  },
+  textInput: {
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
+    paddingHorizontal: Spacing.three,
+    fontSize: 15,
+    backgroundColor: '#F7F8FA',
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.three,
+    fontSize: 15,
+    height: 100,
+    backgroundColor: '#F7F8FA',
+    textAlignVertical: 'top',
+    marginBottom: Spacing.four,
+  },
+  inputErrorBorder: {
+    borderColor: '#FF3B30',
+  },
+  errorText: {
+    color: '#FF3B30',
+    fontSize: 12,
+    marginTop: Spacing.one,
+  },
+  attachmentItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
+    padding: Spacing.three,
+    gap: Spacing.three,
+    marginBottom: Spacing.two,
+  },
+  attachmentDetails: {
+    flex: 1,
+  },
+  attachmentName: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  attachmentSize: {
+    fontSize: 11,
+    color: '#8E8E93',
+  },
+  removeAttachmentBtn: {
+    padding: Spacing.one,
   },
   uploadButton: {
     flexDirection: 'row',
@@ -773,33 +790,15 @@ const styles = StyleSheet.create({
     height: 48,
     borderWidth: 1.5,
     borderStyle: 'dashed',
-    borderRadius: Spacing.two,
+    borderColor: '#1EBD60',
+    borderRadius: 8,
     gap: Spacing.two,
-    marginTop: Spacing.two,
+    backgroundColor: '#E8F5E9',
   },
   uploadButtonText: {
-    color: '#1E7C9A',
-  },
-  attachmentsList: {
-    gap: Spacing.two,
-    marginBottom: Spacing.three,
-  },
-  attachmentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
-    gap: Spacing.three,
-  },
-  attachmentDetails: {
-    flex: 1,
-  },
-  attachmentName: {
-    fontSize: 13,
-  },
-  removeButton: {
-    padding: Spacing.one,
+    color: '#1EBD60',
+    fontWeight: '700',
+    fontSize: 14,
   },
   deliverySelector: {
     flexDirection: 'row',
@@ -810,51 +809,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    height: 44,
+    height: 48,
     borderWidth: 1,
-    borderRadius: Spacing.one,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
     gap: Spacing.two,
+    backgroundColor: '#F7F8FA',
   },
   deliveryOptionActive: {
-    borderColor: '#1E7C9A',
-    backgroundColor: 'rgba(30, 124, 154, 0.05)',
+    borderColor: '#1EBD60',
+    backgroundColor: '#E8F5E9',
   },
-  deliveryOptionText: {
-    fontSize: 12,
+  deliveryText: {
+    fontSize: 13,
+    fontWeight: '600',
     color: '#60646C',
   },
-  actionRow: {
-    flexDirection: 'row',
-    marginHorizontal: Spacing.four,
-    gap: Spacing.three,
-    marginTop: Spacing.two,
-  },
-  btnCancel: {
-    flex: 1,
-    height: 48,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: Spacing.two,
-    borderWidth: 1,
-  },
   btnSubmit: {
-    flex: 2,
-    backgroundColor: '#1E7C9A', // Beautiful Premium Coral Red Color
+    backgroundColor: '#1EBD60',
     height: 48,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Spacing.two,
+    borderRadius: 8,
+    marginTop: Spacing.three,
   },
   btnSubmitDisabled: {
-    backgroundColor: '#FFA294',
+    opacity: 0.5,
   },
   btnSubmitText: {
     color: '#ffffff',
+    fontSize: 16,
   },
-  errorText: {
-    color: '#D32F2F',
-    fontSize: 11,
-    marginTop: Spacing.one,
+  formNoticeText: {
+    color: '#8E8E93',
+    fontSize: 12,
+    textAlign: 'center',
+    marginTop: Spacing.four,
+    lineHeight: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -865,9 +856,10 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     width: '100%',
-    maxWidth: 400,
+    maxWidth: 360,
     borderRadius: Spacing.three,
     padding: Spacing.four,
+    backgroundColor: '#ffffff',
     maxHeight: '80%',
   },
   modalHeader: {
@@ -876,28 +868,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: Spacing.three,
   },
+  modalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+  },
   calendarSubheader: {
     fontSize: 14,
+    fontWeight: '600',
+    color: '#8E8E93',
     marginBottom: Spacing.three,
   },
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
   },
   calendarDay: {
     width: '12%',
     aspectRatio: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: Spacing.one,
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#E0E1E6',
-    marginBottom: Spacing.one,
+    borderColor: '#EFEFEF',
+    marginBottom: Spacing.two,
+  },
+  calendarDaySelected: {
+    backgroundColor: '#1EBD60',
+    borderColor: '#1EBD60',
   },
   calendarDayText: {
     fontSize: 12,
+    color: '#000000',
   },
   modalList: {
     gap: Spacing.two,
@@ -907,23 +911,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.three,
     borderWidth: 1,
-    borderRadius: Spacing.two,
+    borderColor: '#E0E1E6',
+    borderRadius: 8,
     gap: Spacing.three,
   },
   modalListDetails: {
     flex: 1,
-  },
-  selectedDatesSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: Spacing.four,
-    paddingTop: Spacing.three,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E0E1E6',
-  },
-  clearDatesButton: {
-    paddingVertical: Spacing.one,
-    paddingHorizontal: Spacing.two,
   },
 });

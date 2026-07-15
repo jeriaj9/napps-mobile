@@ -4,7 +4,6 @@ import { StyleSheet, View, Pressable } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 export interface ManagementRequestProps {
   id: string;
@@ -17,7 +16,6 @@ export interface ManagementRequestProps {
 }
 
 export function ManagementCard({ request }: { request: ManagementRequestProps }) {
-  const theme = useTheme();
 
   return (
     <ThemedView style={styles.card} type="background">

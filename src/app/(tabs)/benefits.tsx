@@ -1,32 +1,55 @@
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ScreenHeader } from '@/components/ScreenHeader';
 import { BenefitCard, BenefitProps } from '@/components/benefits/benefit-card';
-import { ManagementCard } from '@/components/benefits/management-card';
 import { ThemedText } from '@/components/themed-text';
+import { TicketProps } from '@/components/tickets/ticket-card';
 import {
   mockAllBenefits,
   mockEnjoyingBenefits,
-  mockManagementRequests,
 } from '@/constants/mockBenefitsData';
+import { addTicket } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
-type TabState = 'enjoying' | 'all' | 'management';
+type TabState = 'enjoying' | 'all';
+
+function generateBenefitRequestId(benefitName: string) {
+  return `req-${benefitName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`;
+}
 
 export default function BenefitsScreen() {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
-  // Set default tab to "all" based on reference images being centered there usually, but "enjoying" is fine too.
-  const [activeTab, setActiveTab] = useState<TabState>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  
+  // 'enjoying' corresponds to "My Benefits" in the screenshot
+  const [activeTab, setActiveTab] = useState<TabState>('enjoying');
   const [allBenefits, setAllBenefits] = useState<BenefitProps[]>(mockAllBenefits);
 
   const handleDeleteBenefit = (id: string) => {
     setAllBenefits(allBenefits.filter((benefit) => benefit.id !== id));
+  };
+
+  const handleRequestBenefit = (benefitName: string) => {
+    alert(`Enrollment request for "${benefitName}" submitted successfully!`);
+    const newRequest: TicketProps = {
+      id: generateBenefitRequestId(benefitName),
+      status: 'PENDING',
+      employee: { name: 'SAMUEL LUIS', id: 'NT-2037' },
+      requestType: 'Benefit: ' + benefitName,
+      description: benefitName,
+      requestDate: 'Jun 10',
+      priority: 'Medium',
+    };
+    addTicket(newRequest);
+  };
+
+  const getSubheaderText = () => {
+    switch (activeTab) {
+      case 'enjoying':
+        return 'Here are your currently enrolled benefits.';
+      case 'all':
+        return 'Here are all available employee benefits.';
+    }
   };
 
   const renderContent = () => {
@@ -39,7 +62,7 @@ export default function BenefitsScreen() {
             renderItem={({ item }) => <BenefitCard benefit={item} />}
             contentContainerStyle={[
               styles.listContent,
-              { paddingBottom: insets.bottom + Spacing.six },
+              { paddingBottom: insets.bottom + Spacing.six + 80 }, // extra space for tab bar and floating button
             ]}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
@@ -59,107 +82,51 @@ export default function BenefitsScreen() {
               <BenefitCard
                 benefit={item}
                 onDelete={() => handleDeleteBenefit(item.id)}
+                onRequest={() => handleRequestBenefit(item.title)}
               />
             )}
             contentContainerStyle={[
               styles.listContent,
-              { paddingBottom: insets.bottom + Spacing.six },
+              { paddingBottom: insets.bottom + Spacing.six + 80 },
             ]}
           />
-        );
-      case 'management':
-        return (
-          <>
-            <View style={[styles.filtersContainer, { backgroundColor: theme.background }]}>
-              <View
-                style={[styles.dropdownContainer, { backgroundColor: theme.backgroundElement }]}>
-                <ThemedText style={{ color: theme.textSecondary }}>Pending</ThemedText>
-                <SymbolView
-                  name="chevron.up.chevron.down"
-                  size={12}
-                  tintColor={theme.textSecondary}
-                />
-              </View>
-              <View
-                style={[styles.searchInputContainer, { backgroundColor: theme.backgroundElement }]}>
-                <SymbolView name="magnifyingglass" size={16} tintColor={theme.textSecondary} />
-                <TextInput
-                  style={[styles.searchInput, { color: theme.text }]}
-                  placeholder="Search by benefit..."
-                  placeholderTextColor={theme.textSecondary}
-                  value={searchQuery}
-                  onChangeText={setSearchQuery}
-                />
-              </View>
-            </View>
-            <FlatList
-              data={mockManagementRequests}
-              keyExtractor={(item) => item.id}
-              renderItem={({ item }) => <ManagementCard request={item} />}
-              contentContainerStyle={[
-                styles.listContent,
-                { paddingBottom: insets.bottom + Spacing.six },
-              ]}
-            />
-          </>
         );
     }
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
-      {/* Header */}
-      <ScreenHeader
-        title="My Benefits"
-        subtitle="Unlock the best of your workplace and enjoy your benefits"
-        rightContent={
-          <Pressable style={styles.newBenefitButton}>
-            <SymbolView name="plus" size={14} tintColor="#ffffff" />
-            <ThemedText type="smallBold" style={styles.newBenefitText}>
-              New Benefit
-            </ThemedText>
-          </Pressable>
-        }
-      />
-
-      {/* Sticky Tabs */}
-      <View style={[styles.tabsSection, { backgroundColor: theme.backgroundElement }]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabsContainer}>
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
+      {/* Tab bar header */}
+      <View style={styles.tabsSection}>
+        <View style={styles.tabsContainer}>
           <Pressable
             style={[styles.tab, activeTab === 'enjoying' && styles.activeTab]}
             onPress={() => setActiveTab('enjoying')}>
             <ThemedText
-              type="smallBold"
-              style={[styles.tabText, activeTab === 'enjoying' && { color: theme.text }]}>
-              Enjoying
+              style={[styles.tabText, activeTab === 'enjoying' && styles.activeTabText]}>
+              My Benefits
             </ThemedText>
           </Pressable>
           <Pressable
             style={[styles.tab, activeTab === 'all' && styles.activeTab]}
             onPress={() => setActiveTab('all')}>
             <ThemedText
-              type="smallBold"
-              style={[styles.tabText, activeTab === 'all' && { color: theme.text }]}>
-              All benefits
+              style={[styles.tabText, activeTab === 'all' && styles.activeTabText]}>
+              All Benefits
             </ThemedText>
           </Pressable>
-          <Pressable
-            style={[styles.tab, activeTab === 'management' && styles.activeTab]}
-            onPress={() => setActiveTab('management')}>
-            <ThemedText
-              type="smallBold"
-              style={[styles.tabText, activeTab === 'management' && { color: theme.text }]}>
-              Management
-            </ThemedText>
-          </Pressable>
-        </ScrollView>
+        </View>
       </View>
 
-      {/* Content Area with a lighter background to match the screenshots */}
-      <View style={[styles.contentArea, { backgroundColor: theme.background }]}>
+      {/* Dynamic Subheader instruction text */}
+      <View style={styles.subheader}>
+        <ThemedText style={styles.subheaderText}>
+          {getSubheaderText()}
+        </ThemedText>
+      </View>
+
+      {/* Content Area */}
+      <View style={styles.contentArea}>
         {renderContent()}
       </View>
     </View>
@@ -170,73 +137,54 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    backgroundColor: '#1E7C9A', // Teal Gradient match
-    paddingBottom: Spacing.four,
-    borderBottomLeftRadius: Spacing.four,
-    borderBottomRightRadius: Spacing.four,
-    marginBottom: Spacing.four,
-  },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
-  },
-  headerTextContainer: {
-    flex: 1,
-    paddingRight: Spacing.four,
-  },
-  headerTitle: {
-    color: '#ffffff',
-    fontSize: 24,
-  },
-  headerSubtitle: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 12,
-  },
-  newBenefitButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#4DB6AC', // Lighter Teal Button
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.one,
-    gap: Spacing.one,
-  },
-  newBenefitText: {
-    color: '#ffffff',
-    textTransform: 'uppercase',
-  },
   tabsSection: {
-    paddingHorizontal: Spacing.four,
+    backgroundColor: '#ffffff',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E0E1E6',
     zIndex: 1,
   },
   tabsContainer: {
     flexDirection: 'row',
-    gap: Spacing.six,
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+    paddingHorizontal: Spacing.four,
   },
   tab: {
-    paddingBottom: Spacing.two,
-    borderBottomWidth: 2,
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.three,
+    borderBottomWidth: 3,
     borderBottomColor: 'transparent',
   },
   activeTab: {
-    borderBottomColor: '#15395A', // Dark underline
+    borderBottomColor: '#1EBD60',
   },
   tabText: {
-    color: '#9E9E9E', // Inactive text
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#8E8E93',
+  },
+  activeTabText: {
+    color: '#1EBD60',
+    fontWeight: '700',
+  },
+  subheader: {
+    paddingHorizontal: Spacing.four,
+    paddingVertical: Spacing.three,
+    maxWidth: MaxContentWidth,
+    alignSelf: 'center',
+    width: '100%',
+  },
+  subheaderText: {
+    color: '#60646C',
+    fontSize: 15,
   },
   contentArea: {
     flex: 1,
   },
   listContent: {
-    paddingTop: Spacing.four,
+    paddingTop: Spacing.one,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
@@ -247,39 +195,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingTop: 100,
   },
-  filtersContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.four,
-    paddingTop: Spacing.four,
-    paddingBottom: Spacing.two,
-    gap: Spacing.three,
-  },
-  dropdownContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E0E1E6',
-    minWidth: 100,
-  },
-  searchInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
-    borderRadius: Spacing.two,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E0E1E6',
-    gap: Spacing.two,
-  },
-  searchInput: {
-    flex: 1,
-    height: 24,
-    fontSize: 14,
-  },
 });
+

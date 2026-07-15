@@ -2,33 +2,25 @@ import { SymbolView } from 'expo-symbols';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { ScreenHeader } from '@/components/ScreenHeader';
-import { ProfileCard } from '@/components/profile/profile-card';
 import { ThemedText } from '@/components/themed-text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 const mockProfileData = {
-  header: {
-    initials: 'SL',
-    name: 'SAMUEL LUIS',
-    badges: ['ACTIVE', 'ADMIN'],
-    jobTitle: 'Engineer II',
-    id: '2037',
+  initials: 'SL',
+  name: 'SAMUEL LUIS',
+  role: 'Engineer II',
+  departmentInfo: 'Engineering • Joined October 2020',
+  contact: {
+    email: 'samuelluis@outlook.com',
+    phone: '829-570-4634',
+    location: 'No address added yet.',
   },
-  evaluationScore: {
-    label: 'NO CHANGE',
-    thisQuarter: 0,
-    thisQuarterLabel: 'Q2 2026',
-    lastQuarter: 0,
+  stats: {
+    vacationDays: 12,
+    vacationDaysLabel: 'Remaining',
+    lastQuarterScore: 0,
     lastQuarterLabel: 'Q1 2026',
   },
-  contact: {
-    phone: '8295704634',
-    email: 'samuelluis@outlook.com',
-    vendor: 'Not provided',
-  },
-  address: 'No address added yet.',
   workInformation: {
     startDate: 'October 12, 2020',
     supervisor: 'JUAN PRADO',
@@ -53,187 +45,136 @@ const mockProfileData = {
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const theme = useTheme();
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
-      <ScreenHeader>
-        <View style={styles.headerContent}>
-          <View style={styles.avatar}>
-            <ThemedText style={styles.avatarText}>{mockProfileData.header.initials}</ThemedText>
-            <View style={styles.activeDot} />
+    <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + Spacing.six + 80 }]}
+      >
+        {/* Profile Card */}
+        <View style={styles.profileCard}>
+          <View style={styles.headerRow}>
+            <View style={styles.avatarBox}>
+              <ThemedText style={styles.avatarText}>{mockProfileData.initials}</ThemedText>
+            </View>
+            <View style={styles.headerInfo}>
+              <ThemedText style={styles.nameText}>{mockProfileData.name}</ThemedText>
+              <ThemedText style={styles.roleText}>{mockProfileData.role}</ThemedText>
+              <ThemedText style={styles.deptText}>{mockProfileData.departmentInfo}</ThemedText>
+            </View>
           </View>
-          <View style={styles.headerInfo}>
-            <View style={styles.nameRow}>
-              <ThemedText type="subtitle" style={styles.nameText}>
-                {mockProfileData.header.name}
-              </ThemedText>
+
+          {/* Divider */}
+          <View style={styles.divider} />
+
+          {/* Contact Details List */}
+          <View style={styles.contactList}>
+            {/* Email */}
+            <View style={styles.contactItem}>
+              <View style={styles.contactIconWrapper}>
+                <SymbolView name="envelope" size={18} tintColor="#1EBD60" />
+              </View>
+              <View style={styles.contactTextWrapper}>
+                <ThemedText style={styles.contactLabel}>EMAIL</ThemedText>
+                <ThemedText style={styles.contactValue}>{mockProfileData.contact.email}</ThemedText>
+              </View>
             </View>
-            <View style={styles.badgeRow}>
-              {mockProfileData.header.badges.map((badge, idx) => (
-                <View key={idx} style={[styles.badge, badge === 'ADMIN' && styles.badgeAdmin]}>
-                  <ThemedText style={[styles.badgeText, badge === 'ADMIN' && styles.badgeTextAdmin]}>
-                    {badge}
-                  </ThemedText>
-                </View>
-              ))}
+
+            {/* Phone */}
+            <View style={styles.contactItem}>
+              <View style={styles.contactIconWrapper}>
+                <SymbolView name="phone" size={18} tintColor="#1EBD60" />
+              </View>
+              <View style={styles.contactTextWrapper}>
+                <ThemedText style={styles.contactLabel}>PHONE</ThemedText>
+                <ThemedText style={styles.contactValue}>{mockProfileData.contact.phone}</ThemedText>
+              </View>
             </View>
-            <ThemedText style={styles.headerSubtext}>{mockProfileData.header.jobTitle}</ThemedText>
-            <ThemedText style={styles.headerSubtext}>ID: {mockProfileData.header.id}</ThemedText>
+
+            {/* Location */}
+            <View style={styles.contactItem}>
+              <View style={styles.contactIconWrapper}>
+                <SymbolView name="mappin.and.ellipse" size={18} tintColor="#1EBD60" />
+              </View>
+              <View style={styles.contactTextWrapper}>
+                <ThemedText style={styles.contactLabel}>LOCATION</ThemedText>
+                <ThemedText style={styles.contactValue}>{mockProfileData.contact.location}</ThemedText>
+              </View>
+            </View>
           </View>
         </View>
-      </ScreenHeader>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.cardsContainer}>
-        {/* Evaluation Score */}
-        <ProfileCard
-          title="Evaluation Score"
-          headerRight={
-            <View style={styles.noChangeBadge}>
-              <ThemedText style={styles.noChangeText}>{mockProfileData.evaluationScore.label}</ThemedText>
-            </View>
-          }>
-          <View style={styles.evalRow}>
-            <View style={styles.evalColumn}>
-              <ThemedText type="small" themeColor="textSecondary">
-                This Quarter
-              </ThemedText>
-              <View style={styles.evalCircle}>
-                <ThemedText type="smallBold">{mockProfileData.evaluationScore.thisQuarter}%</ThemedText>
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                {mockProfileData.evaluationScore.thisQuarterLabel}
-              </ThemedText>
-            </View>
-            <View style={styles.evalColumn}>
-              <ThemedText type="small" themeColor="textSecondary">
-                Last Quarter
-              </ThemedText>
-              <View style={styles.evalCircle}>
-                <ThemedText type="smallBold">{mockProfileData.evaluationScore.lastQuarter}%</ThemedText>
-              </View>
-              <ThemedText type="small" themeColor="textSecondary">
-                {mockProfileData.evaluationScore.lastQuarterLabel}
-              </ThemedText>
-            </View>
+        {/* Stats Grid */}
+        <View style={styles.statsGrid}>
+          {/* Vacation Days */}
+          <View style={styles.statsCard}>
+            <ThemedText style={styles.statsLabel}>VACATION DAYS</ThemedText>
+            <ThemedText style={styles.statsValue}>{mockProfileData.stats.vacationDays}</ThemedText>
+            <ThemedText style={styles.statsSublabel}>{mockProfileData.stats.vacationDaysLabel}</ThemedText>
           </View>
-        </ProfileCard>
 
-        {/* Contact Information */}
-        <ProfileCard
-          title="Contact Information"
-          headerRight={<SymbolView name="pencil" size={16} tintColor={theme.textSecondary} />}>
-          <View style={styles.infoRow}>
-            <SymbolView name="phone" size={16} tintColor={theme.textSecondary} />
-            <ThemedText style={styles.infoText}>{mockProfileData.contact.phone}</ThemedText>
+          {/* Last Quarter Score */}
+          <View style={styles.statsCard}>
+            <ThemedText style={styles.statsLabel}>LAST QUARTER</ThemedText>
+            <ThemedText style={styles.statsValue}>{mockProfileData.stats.lastQuarterScore}%</ThemedText>
+            <ThemedText style={styles.statsSublabel}>{mockProfileData.stats.lastQuarterLabel}</ThemedText>
           </View>
-          <View style={styles.infoRow}>
-            <SymbolView name="envelope" size={16} tintColor={theme.textSecondary} />
-            <ThemedText style={styles.infoText}>{mockProfileData.contact.email}</ThemedText>
-          </View>
-          <View style={styles.infoRow}>
-            <SymbolView name="briefcase" size={16} tintColor={theme.textSecondary} />
-            <ThemedText style={styles.infoText}>{mockProfileData.contact.vendor}</ThemedText>
-          </View>
-        </ProfileCard>
+        </View>
 
-        {/* Address */}
-        <ProfileCard
-          title="Address"
-          headerRight={<SymbolView name="pencil" size={16} tintColor={theme.textSecondary} />}>
-          <View style={styles.infoRow}>
-            <SymbolView name="mappin.and.ellipse" size={16} tintColor={theme.textSecondary} />
-            <ThemedText style={styles.infoText} themeColor="textSecondary">
-              {mockProfileData.address}
-            </ThemedText>
-          </View>
-        </ProfileCard>
-
-        {/* Work Information */}
-        <ProfileCard title="Work Information">
+        {/* Work Information Card */}
+        <View style={[styles.profileCard, { marginTop: Spacing.four }]}>
+          <ThemedText style={styles.cardTitle}>Work Information</ThemedText>
           <View style={styles.workGrid}>
             <View style={styles.workGridItem}>
-              <View style={styles.infoRowSmall}>
-                <SymbolView name="calendar" size={14} tintColor={theme.textSecondary} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Start Date
-                </ThemedText>
-              </View>
-              <ThemedText type="smallBold">{mockProfileData.workInformation.startDate}</ThemedText>
+              <ThemedText style={styles.gridLabel}>START DATE</ThemedText>
+              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.startDate}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
-              <View style={styles.infoRowSmall}>
-                <SymbolView name="person" size={14} tintColor={theme.textSecondary} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Supervisor
-                </ThemedText>
-              </View>
-              <ThemedText type="smallBold">{mockProfileData.workInformation.supervisor}</ThemedText>
+              <ThemedText style={styles.gridLabel}>SUPERVISOR</ThemedText>
+              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.supervisor}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
-              <View style={styles.infoRowSmall}>
-                <SymbolView name="building.2" size={14} tintColor={theme.textSecondary} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Vendor
-                </ThemedText>
-              </View>
-              <ThemedText type="smallBold">{mockProfileData.workInformation.vendor}</ThemedText>
+              <ThemedText style={styles.gridLabel}>VENDOR</ThemedText>
+              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.vendor}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
-              <View style={styles.infoRowSmall}>
-                <SymbolView name="star" size={14} tintColor={theme.textSecondary} />
-                <ThemedText type="small" themeColor="textSecondary">
-                  Branch
-                </ThemedText>
-              </View>
-              <ThemedText type="smallBold">{mockProfileData.workInformation.branch}</ThemedText>
+              <ThemedText style={styles.gridLabel}>BRANCH</ThemedText>
+              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.branch}</ThemedText>
             </View>
           </View>
 
-          <ThemedText type="smallBold" style={styles.sectionSubTitle}>
-            Positions
-          </ThemedText>
+          <ThemedText style={styles.cardSubtitle}>Positions</ThemedText>
           {mockProfileData.workInformation.positions.map((pos, idx) => (
             <View key={idx} style={styles.positionItem}>
               <View style={styles.positionAccent} />
-              <View>
+              <View style={styles.positionContent}>
                 <ThemedText style={styles.positionTitle}>{pos.title}</ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  Client: {pos.client}
-                </ThemedText>
-                <ThemedText type="small" themeColor="textSecondary">
-                  {pos.details}
-                </ThemedText>
+                <ThemedText style={styles.positionClient}>Client: {pos.client}</ThemedText>
+                <ThemedText style={styles.positionDetails}>{pos.details}</ThemedText>
               </View>
             </View>
           ))}
 
-          <ThemedText type="smallBold" style={styles.sectionSubTitle}>
-            Roles
-          </ThemedText>
-          <View style={styles.badgeRow}>
+          <ThemedText style={styles.cardSubtitle}>Roles</ThemedText>
+          <View style={styles.rolesRow}>
             {mockProfileData.workInformation.roles.map((role, idx) => (
               <View key={idx} style={styles.roleBadge}>
-                <ThemedText type="smallBold" style={styles.roleBadgeText}>
-                  {role}
-                </ThemedText>
+                <ThemedText style={styles.roleBadgeText}>{role}</ThemedText>
               </View>
             ))}
           </View>
-        </ProfileCard>
+        </View>
 
-        {/* Interests */}
-        <ProfileCard
-          title="Interests"
-          headerRight={<SymbolView name="pencil" size={16} tintColor={theme.textSecondary} />}>
-          <ThemedText themeColor="textSecondary">{mockProfileData.interests}</ThemedText>
-        </ProfileCard>
+        {/* Interests Card */}
+        <View style={styles.profileCard}>
+          <ThemedText style={styles.cardTitle}>Interests</ThemedText>
+          <ThemedText style={styles.interestsText}>{mockProfileData.interests}</ThemedText>
+        </View>
 
-        {/* Skills & Expertise */}
-        <ProfileCard
-          title="Skills & Expertise"
-          headerRight={<SymbolView name="plus" size={16} tintColor={theme.textSecondary} />}>
+        {/* Skills & Expertise Card */}
+        <View style={styles.profileCard}>
+          <ThemedText style={styles.cardTitle}>Skills & Expertise</ThemedText>
           <View style={styles.skillsRow}>
             {mockProfileData.skills.map((skill, idx) => (
               <View key={idx} style={styles.skillChip}>
@@ -243,20 +184,16 @@ export default function ProfileScreen() {
                       key={star}
                       name={star <= skill.rating ? 'star.fill' : 'star'}
                       size={10}
-                      tintColor={star <= skill.rating ? '#4CAF50' : theme.textSecondary}
+                      tintColor={star <= skill.rating ? '#1EBD60' : '#8E8E93'}
                     />
                   ))}
                 </View>
-                <ThemedText type="smallBold" style={styles.skillText}>
-                  {skill.name}
-                </ThemedText>
-                <SymbolView name="trash" size={12} tintColor="#E53935" />
+                <ThemedText style={styles.skillText}>{skill.name}</ThemedText>
               </View>
             ))}
           </View>
-        </ProfileCard>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
     </View>
   );
 }
@@ -265,183 +202,218 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
   scrollContent: {
-    paddingBottom: Spacing.six,
-  },
-  headerGradient: {
-    backgroundColor: '#1E7C9A', // Teal/Blue gradient match
-    paddingBottom: Spacing.five,
-    borderBottomLeftRadius: Spacing.four,
-    borderBottomRightRadius: Spacing.four,
-    marginBottom: Spacing.four,
-  },
-  headerContent: {
-    flexDirection: 'row',
     paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.four,
+    paddingTop: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
+    gap: Spacing.four,
   },
-  avatar: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    justifyContent: 'center',
+  profileCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    padding: Spacing.four,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  headerRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    position: 'relative',
+    gap: Spacing.four,
+  },
+  avatarBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: '#F0F2F5',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarText: {
-    color: '#ffffff',
     fontSize: 24,
     fontWeight: '700',
-  },
-  activeDot: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#1E7C9A',
+    color: '#1EBD60',
   },
   headerInfo: {
     flex: 1,
-    gap: Spacing.one / 2,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    gap: 2,
   },
   nameText: {
-    color: '#ffffff',
-    fontSize: 20,
-    lineHeight: 24,
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-    flexWrap: 'wrap',
-    marginBottom: Spacing.one,
-  },
-  badge: {
-    backgroundColor: '#4CAF50',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  badgeAdmin: {
-    backgroundColor: '#FFB300',
-  },
-  badgeText: {
-    color: '#ffffff',
-    fontSize: 10,
+    fontSize: 22,
     fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  badgeTextAdmin: {
     color: '#000000',
   },
-  headerSubtext: {
-    color: 'rgba(255,255,255,0.8)',
-    fontSize: 14,
+  roleText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1EBD60',
   },
-  cardsContainer: {
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    width: '100%',
+  deptText: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
   },
-  noChangeBadge: {
-    backgroundColor: '#F0F0F3',
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 4,
-    borderRadius: 12,
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E0E1E6',
+    marginVertical: Spacing.four,
   },
-  noChangeText: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: '#60646C',
-  },
-  evalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: Spacing.two,
-  },
-  evalColumn: {
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  evalCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: '#E0E1E6',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  contactList: {
     gap: Spacing.three,
-    marginBottom: Spacing.three,
   },
-  infoText: {
-    fontSize: 14,
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#F0F2F5',
+    borderRadius: Spacing.two,
+    padding: Spacing.three,
+    gap: Spacing.three,
+  },
+  contactIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F7F8FA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  contactTextWrapper: {
     flex: 1,
+    gap: 1,
+  },
+  contactLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
+  },
+  contactValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: Spacing.three,
+  },
+  statsCard: {
+    flex: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: Spacing.three,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+    padding: Spacing.four,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 2,
+    gap: 4,
+  },
+  statsLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    letterSpacing: 0.5,
+  },
+  statsValue: {
+    fontSize: 32,
+    paddingTop: 12,
+    paddingBottom: 6,
+    fontWeight: '600',
+    color: '#1EBD60',
+  },
+  statsSublabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  cardTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+    marginBottom: Spacing.four,
+  },
+  cardSubtitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#60646C',
+    marginTop: Spacing.four,
+    marginBottom: Spacing.two,
   },
   workGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.four,
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.two,
   },
   workGridItem: {
     width: '45%',
-    gap: Spacing.one,
+    gap: 2,
   },
-  infoRowSmall: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.one,
+  gridLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#8E8E93',
   },
-  sectionSubTitle: {
-    marginTop: Spacing.two,
-    marginBottom: Spacing.two,
+  gridValue: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
   },
   positionItem: {
     flexDirection: 'row',
     gap: Spacing.three,
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.three,
   },
   positionAccent: {
     width: 3,
-    backgroundColor: '#1E7C9A',
+    backgroundColor: '#1EBD60',
     borderRadius: 2,
   },
+  positionContent: {
+    flex: 1,
+  },
   positionTitle: {
-    fontWeight: '600',
     fontSize: 14,
-    marginBottom: 2,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  positionClient: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  positionDetails: {
+    fontSize: 12,
+    color: '#8E8E93',
+  },
+  rolesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
   },
   roleBadge: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: '#E8F5E9',
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.one,
-    borderRadius: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
   roleBadgeText: {
-    color: '#1565C0',
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#1EBD60',
+  },
+  interestsText: {
+    fontSize: 14,
+    color: '#8E8E93',
   },
   skillsRow: {
     flexDirection: 'row',
@@ -451,7 +423,7 @@ const styles = StyleSheet.create({
   skillChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F0F0F3', // Light theme assumption, better to use themed view
+    backgroundColor: '#F0F2F5',
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
     borderRadius: 20,
@@ -463,5 +435,7 @@ const styles = StyleSheet.create({
   },
   skillText: {
     fontSize: 12,
+    fontWeight: '600',
+    color: '#000000',
   },
 });

@@ -1,165 +1,252 @@
-import { SymbolView, SFSymbol } from 'expo-symbols';
-import { StyleSheet, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 
 export interface TicketProps {
   id: string;
-  status: 'OPEN' | 'IN PROGRESS' | 'RESOLVED';
+  status: 'APPROVED' | 'PENDING' | 'DENIED' | 'OPEN' | 'IN PROGRESS' | 'RESOLVED';
   assignedTo?: { name: string; id: string };
   employee?: { name: string; id: string };
   requestType: string;
   priority: 'Low' | 'Medium' | 'High';
-  requestDate: string;
-  ageSla: { current: number; limit: number };
+  requestDate: string; // Used as submission date, e.g. "May 31"
+  dateRange?: string; // Used as duration, e.g. "2025-06-22 to 2025-06-29"
+  description?: string; // e.g. "Summer vacation"
+  ageSla?: { current: number; limit: number };
 }
 
-export function TicketCard({ ticket }: { ticket: TicketProps }) {
-  const theme = useTheme();
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'OPEN': return { bg: '#E3F2FD', text: '#1976D2' };
-      case 'IN PROGRESS': return { bg: '#FFF3E0', text: '#F57C00' };
-      case 'RESOLVED': return { bg: '#E8F5E9', text: '#388E3C' };
-      default: return { bg: '#F5F5F5', text: '#9E9E9E' };
+export function TicketCard({
+  ticket,
+  onApprove,
+  onReject,
+}: {
+  ticket: TicketProps;
+  onApprove?: () => void;
+  onReject?: () => void;
+}) {
+  const getTicketIcon = (type: string) => {
+    const t = type.toLowerCase();
+    if (t.includes('vacation')) {
+      return 'beach.umbrella.fill'; // Beach umbrella look
+    } else if (t.includes('sick') || t.includes('licence')) {
+      return 'cross.case.fill'; // Medical building/hospital
+    } else if (t.includes('overtime')) {
+      return 'clock.fill'; // Alarm clock
+    } else if (t.includes('letter') || t.includes('carta')) {
+      return 'doc.text.fill'; // Employment letter
+    } else if (t.includes('benefit')) {
+      return 'gift.fill'; // Gift box icon
     }
+    return 'doc.text.fill';
   };
 
-  const getPriorityIcon = (priority: string): SFSymbol => {
-    switch (priority) {
-      case 'Low': return 'chevron.down.2';
-      case 'Medium': return 'equal';
-      case 'High': return 'chevron.up.2';
-      default: return 'minus';
+  const getIconColor = (type: string) => {
+    const t = type.toLowerCase();
+    if (t.includes('vacation')) {
+      return '#FF7A00'; // Orange umbrella
+    } else if (t.includes('sick') || t.includes('licence')) {
+      return '#3C87F7'; // Blue hospital
+    } else if (t.includes('overtime')) {
+      return '#FF3B30'; // Red clock
+    } else if (t.includes('letter') || t.includes('carta')) {
+      return '#00C7BE'; // Teal document
+    } else if (t.includes('benefit')) {
+      return '#1EBD60'; // Green (matching theme)
     }
+    return '#8E8E93';
   };
 
-  const statusColors = getStatusColor(ticket.status);
-  const person = ticket.employee || ticket.assignedTo;
-  const personLabel = ticket.employee ? 'Employee' : 'Assigned To';
+  const renderStatus = () => {
+    const status = ticket.status;
+    if (status === 'APPROVED' || status === 'RESOLVED') {
+      return (
+        <View style={styles.approvedBadge}>
+          <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
+        </View>
+      );
+    } else if (status === 'PENDING' || status === 'OPEN') {
+      return (
+        <SymbolView name="exclamationmark.triangle.fill" size={12} tintColor="#FFB000" />
+      );
+    } else if (status === 'DENIED' || status === 'IN PROGRESS') {
+      return (
+        <View style={styles.deniedRow}>
+          <SymbolView name="xmark.circle.fill" size={12} tintColor="#FF3B30" />
+        </View>
+      );
+    }
+    return <ThemedText style={styles.pendingText}>{status}</ThemedText>;
+  };
 
   return (
-    <ThemedView style={styles.card} type="background">
-      <View style={styles.header}>
-        <ThemedText type="smallBold" style={styles.requestType}>{ticket.requestType}</ThemedText>
-        <View style={[styles.statusBadge, { backgroundColor: statusColors.bg }]}>
-          <ThemedText style={[styles.statusText, { color: statusColors.text }]}>{ticket.status}</ThemedText>
-        </View>
-      </View>
-
-      <View style={styles.body}>
-        <View style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary">ID:</ThemedText>
-          <View style={styles.idContainer}>
-            <ThemedText type="smallBold">{ticket.id}</ThemedText>
-            <SymbolView name="doc.on.doc" size={12} tintColor={theme.textSecondary} />
+    <View style={styles.cardContainer}>
+      <View style={styles.rowContainer}>
+        <View style={styles.leftCol}>
+          <View style={styles.iconWrapper}>
+            <SymbolView
+              name={getTicketIcon(ticket.requestType) as any}
+              size={26}
+              tintColor={getIconColor(ticket.requestType)}
+            />
+          </View>
+          <View style={styles.textContainer}>
+            {ticket.employee && (
+              <ThemedText style={styles.employeeText}>
+                {ticket.employee.name}
+              </ThemedText>
+            )}
+            <ThemedText style={styles.descriptionText}>
+              {ticket.description || 'Request Details'}
+            </ThemedText>
+            <ThemedText style={styles.dateText}>
+              {ticket.dateRange || ticket.requestDate}
+            </ThemedText>
           </View>
         </View>
 
-        {person && (
-          <View style={styles.row}>
-            <ThemedText type="small" themeColor="textSecondary">{personLabel}:</ThemedText>
-            <View style={styles.personContainer}>
-               <ThemedText type="small">{person.name}</ThemedText>
-               <ThemedText type="small" themeColor="textSecondary">{person.id}</ThemedText>
-            </View>
-          </View>
-        )}
-
-        <View style={styles.row}>
-          <ThemedText type="small" themeColor="textSecondary">Priority:</ThemedText>
-          <View style={styles.priorityContainer}>
-            <SymbolView name={getPriorityIcon(ticket.priority)} size={12} tintColor={theme.text} />
-            <ThemedText type="small">{ticket.priority}</ThemedText>
-          </View>
+        <View style={styles.rightCol}>
+          <View style={styles.statusWrapper}>{renderStatus()}</View>
+          <ThemedText style={styles.requestDateText}>
+            {ticket.requestDate}
+          </ThemedText>
         </View>
       </View>
 
-      <View style={styles.footer}>
-        <ThemedText type="small" themeColor="textSecondary">{ticket.requestDate}</ThemedText>
-        <View style={styles.slaContainer}>
-          <SymbolView name="exclamationmark.circle" size={14} tintColor="#D32F2F" />
-          <ThemedText style={styles.slaText}>{ticket.ageSla.current} d / {ticket.ageSla.limit} d</ThemedText>
+      {onApprove && onReject && ticket.status === 'PENDING' && (
+        <View style={styles.footer}>
+          <Pressable style={[styles.actionButton, styles.approveBtn]} onPress={onApprove}>
+            <SymbolView name="checkmark" size={14} tintColor="#388E3C" />
+            <ThemedText type="smallBold" style={{ color: '#388E3C' }}>
+              Approve
+            </ThemedText>
+          </Pressable>
+          <Pressable style={[styles.actionButton, styles.rejectBtn]} onPress={onReject}>
+            <SymbolView name="xmark" size={14} tintColor="#D32F2F" />
+            <ThemedText type="smallBold" style={{ color: '#D32F2F' }}>
+              Reject
+            </ThemedText>
+          </Pressable>
         </View>
-      </View>
-    </ThemedView>
+      )}
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    borderRadius: Spacing.three,
-    padding: Spacing.four,
-    marginBottom: Spacing.three,
-    marginHorizontal: Spacing.four,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E0E1E6',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+  cardContainer: {
+    width: '100%',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: Spacing.three,
-  },
-  requestType: {
-    fontSize: 16,
-  },
-  statusBadge: {
-    paddingHorizontal: Spacing.two,
-    paddingVertical: 2,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 10,
-    fontWeight: '700',
-  },
-  body: {
-    gap: Spacing.two,
-    marginBottom: Spacing.three,
-  },
-  row: {
+  rowContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
+    paddingVertical: Spacing.three,
+    paddingHorizontal: Spacing.four,
   },
-  personContainer: {
+  leftCol: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    flex: 1,
+    gap: Spacing.three,
+  },
+  iconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F7F8FA',
+  },
+  textContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  employeeText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  titleText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  descriptionText: {
+    fontSize: 14,
+    color: '#60646C',
+  },
+  dateText: {
+    fontSize: 10,
+    color: '#8E8E93',
+  },
+  rightCol: {
     alignItems: 'flex-end',
+    justifyContent: 'space-between',
+    height: 48,
   },
-  idContainer: {
+  statusWrapper: {
+    marginBottom: 4,
+  },
+  approvedBadge: {
+    backgroundColor: '#E8F5E9',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: 4,
   },
-  priorityContainer: {
+  approvedText: {
+    color: '#1EBD60',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pendingText: {
+    color: '#FFB000', // Yellow
+    fontSize: 13,
+    fontWeight: '700',
+    paddingVertical: 4,
+  },
+  deniedRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
+    gap: 4,
+    paddingVertical: 4,
+  },
+  deniedText: {
+    color: '#FF3B30', // Red
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  requestDateText: {
+    fontSize: 12,
+    color: '#8E8E93',
   },
   footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: Spacing.three,
     paddingTop: Spacing.three,
+    paddingBottom: Spacing.three,
+    paddingHorizontal: Spacing.four,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#E0E1E6',
   },
-  slaContainer: {
+  actionButton: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.one,
     gap: Spacing.one,
   },
-  slaText: {
-    color: '#D32F2F',
-    fontSize: 12,
-    fontWeight: '600',
+  approveBtn: {
+    backgroundColor: '#E8F5E9',
+  },
+  rejectBtn: {
+    backgroundColor: '#FFEBEE',
   },
 });
+

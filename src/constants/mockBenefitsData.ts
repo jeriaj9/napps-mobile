@@ -1,69 +1,85 @@
 import { BenefitProps } from '@/components/benefits/benefit-card';
-import { ManagementRequestProps } from '@/components/benefits/management-card';
 
 export const mockAllBenefits: BenefitProps[] = [
   {
     id: '1',
-    title: 'Test Benefit',
-    description: 'test',
-    thumbnailInitials: 'TE',
+    title: 'Health Insurance',
+    description: 'Comprehensive medical, dental, and vision coverage',
+    thumbnailInitials: 'HE',
+    isEnjoying: false,
   },
   {
     id: '2',
-    title: 'Membresía Corporativa FixoCargo',
-    description: 'Tarifa preferencial en uso de Courier.',
-    thumbnailInitials: 'FI',
+    title: '401(k) Plan',
+    description: 'Retirement savings with company match up to 4%',
+    thumbnailInitials: 'RE',
+    isEnjoying: false,
   },
   {
     id: '3',
-    title: 'Membresía Corporativa EPS',
-    description: 'Tarifa preferencial en uso de Courier.',
-    thumbnailInitials: 'EP',
+    title: 'Wellness Program',
+    description: 'Gym membership and mental health support',
+    thumbnailInitials: 'WE',
+    isEnjoying: false,
   },
   {
     id: '4',
-    title: 'Pago de Certificaciones',
-    description: 'La certificación debe estar relacionada directamente con su línea de trabajo.',
-    thumbnailInitials: 'PA',
+    title: 'Life Insurance',
+    description: 'Life insurance coverage at 2x annual salary',
+    thumbnailInitials: 'LI',
+    isEnjoying: false,
   },
   {
     id: '5',
-    title: 'Membresia Corporativa a Gimnasio',
-    description: 'Subsidio a membresía en Body Shop.',
-    thumbnailInitials: 'GI',
+    title: 'Parental Leave',
+    description: 'Paid leave for new parents following birth or adoption',
+    thumbnailInitials: 'PA',
+    isEnjoying: false,
   },
   {
     id: '6',
-    title: 'Seguro de vida',
-    description: 'Prueba de Thumbnail.',
-    thumbnailInitials: 'SE',
+    title: 'Premium Gym Membership',
+    description: 'Access to 500+ gyms nationwide, unlimited classes',
+    thumbnailInitials: 'GY',
+    isEnjoying: false,
   },
   {
     id: '7',
-    title: 'Fripick',
-    description: 'Subsidio de almuerzo / Farmacia Los Hidalgos',
-    thumbnailInitials: 'FR',
+    title: 'Courier Discounts',
+    description: 'Up to 20% discount on courier and shipping services',
+    thumbnailInitials: 'CO',
+    isEnjoying: false,
+  },
+  {
+    id: '8',
+    title: 'Transportation Benefits',
+    description: 'Monthly transit passes and parking subsidies',
+    thumbnailInitials: 'TR',
+    isEnjoying: false,
   },
 ];
 
 export const mockEnjoyingBenefits: BenefitProps[] = [
   {
-    id: '5',
-    title: 'Membresia Corporativa a Gimnasio',
-    description: 'Subsidio a membresía en Body Shop.',
-    thumbnailInitials: 'GI',
+    id: '1',
+    title: 'Health Insurance',
+    description: 'Comprehensive medical, dental, and vision coverage',
+    thumbnailInitials: 'HE',
+    isEnjoying: true,
+  },
+  {
+    id: '2',
+    title: '401(k) Plan',
+    description: 'Retirement savings with company match up to 4%',
+    thumbnailInitials: 'RE',
+    isEnjoying: true,
+  },
+  {
+    id: '3',
+    title: 'Wellness Program',
+    description: 'Gym membership and mental health support',
+    thumbnailInitials: 'WE',
     isEnjoying: true,
   },
 ];
 
-export const mockManagementRequests: ManagementRequestProps[] = [
-  {
-    id: '1',
-    employeeName: 'LEOBARDO NÚÑEZ',
-    employeeId: 'NT-5890',
-    benefitName: 'Pago de Certificaciones',
-    status: 'PENDING',
-    requestDate: 'May 1, 2026',
-    reason: '—',
-  },
-];
