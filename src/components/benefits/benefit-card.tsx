@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Swipeable from 'react-native-gesture-handler/Swipeable';
@@ -23,6 +24,14 @@ export function BenefitCard({
   onDelete?: () => void;
   onRequest?: () => void;
 }) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    router.push({
+      pathname: '/benefit-detail',
+      params: { id: benefit.id },
+    });
+  };
 
   const getBenefitIcon = (title: string) => {
     const t = title.toLowerCase();
@@ -58,37 +67,39 @@ export function BenefitCard({
   };
 
   const cardContent = (
-    <ThemedView style={styles.card} type="background">
-      <View style={styles.contentRow}>
-        <View style={styles.iconWrapper}>
-          <SymbolView
-            name={getBenefitIcon(benefit.title) as any}
-            size={28}
-            tintColor="#1EBD60"
-          />
-        </View>
-        <View style={styles.textContainer}>
-          <ThemedText style={styles.title}>{benefit.title}</ThemedText>
-          <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
-            {benefit.description}
-          </ThemedText>
-          
-          {benefit.isEnjoying ? (
-            <View style={styles.badgeContainer}>
-              <View style={styles.activeBadge}>
-                <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
-                <ThemedText style={styles.activeText}>Enrolled</ThemedText>
+    <Pressable onPress={handlePress}>
+      <ThemedView style={styles.card} type="background">
+        <View style={styles.contentRow}>
+          <View style={styles.iconWrapper}>
+            <SymbolView
+              name={getBenefitIcon(benefit.title) as any}
+              size={28}
+              tintColor="#1EBD60"
+            />
+          </View>
+          <View style={styles.textContainer}>
+            <ThemedText style={styles.title}>{benefit.title}</ThemedText>
+            <ThemedText type="small" themeColor="textSecondary" style={styles.description}>
+              {benefit.description}
+            </ThemedText>
+            
+            {benefit.isEnjoying ? (
+              <View style={styles.badgeContainer}>
+                <View style={styles.activeBadge}>
+                  <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
+                  <ThemedText style={styles.activeText}>Enrolled</ThemedText>
+                </View>
               </View>
-            </View>
-          ) : (
-            <Pressable style={styles.requestButton} onPress={onRequest}>
-              <SymbolView name="plus" size={12} tintColor="#ffffff" />
-              <ThemedText style={styles.requestButtonText}>Request</ThemedText>
-            </Pressable>
-          )}
+            ) : (
+              <Pressable style={styles.requestButton} onPress={onRequest}>
+                <SymbolView name="plus" size={12} tintColor="#ffffff" />
+                <ThemedText style={styles.requestButtonText}>Request</ThemedText>
+              </Pressable>
+            )}
+          </View>
         </View>
-      </View>
-    </ThemedView>
+      </ThemedView>
+    </Pressable>
   );
 
   if (benefit.isEnjoying || !onDelete) {

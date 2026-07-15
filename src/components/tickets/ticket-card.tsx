@@ -1,3 +1,4 @@
+import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -26,6 +27,15 @@ export function TicketCard({
   onApprove?: () => void;
   onReject?: () => void;
 }) {
+  const router = useRouter();
+
+  const handlePress = () => {
+    router.push({
+      pathname: '/ticket-detail',
+      params: { id: ticket.id },
+    });
+  };
+
   const getTicketIcon = (type: string) => {
     const t = type.toLowerCase();
     if (t.includes('vacation')) {
@@ -82,7 +92,7 @@ export function TicketCard({
 
   return (
     <View style={styles.cardContainer}>
-      <View style={styles.rowContainer}>
+      <Pressable style={styles.rowContainer} onPress={handlePress}>
         <View style={styles.leftCol}>
           <View style={styles.iconWrapper}>
             <SymbolView
@@ -112,7 +122,7 @@ export function TicketCard({
             {ticket.requestDate}
           </ThemedText>
         </View>
-      </View>
+      </Pressable>
 
       {onApprove && onReject && ticket.status === 'PENDING' && (
         <View style={styles.footer}>

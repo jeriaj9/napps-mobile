@@ -13,6 +13,8 @@ export default function RootLayout() {
         <Stack>
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="new-ticket" options={{ headerShown: false }} />
+          <Stack.Screen name="ticket-detail" options={{ headerShown: false }} />
+          <Stack.Screen name="benefit-detail" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
     </GestureHandlerRootView>
