@@ -13,7 +13,7 @@ const mockProfileData = {
   contact: {
     email: 'samuelluis@outlook.com',
     phone: '829-570-4634',
-    location: 'No address added yet.',
+    location: 'Santo Domingo R.D.',
   },
   stats: {
     vacationDays: 12,
@@ -26,13 +26,7 @@ const mockProfileData = {
     supervisor: 'JUAN PRADO',
     vendor: 'Not provided',
     branch: 'NTG',
-    positions: [
-      {
-        title: 'Engineer II',
-        client: 'Verizon',
-        details: 'Newtech 02 | YUNHONG LIN',
-      },
-    ],
+    client: 'Verizon',
     roles: ['ADMIN', 'SUPERVISOR'],
   },
   interests: 'No interests added yet.',
@@ -60,7 +54,7 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.headerInfo}>
               <ThemedText style={styles.nameText}>{mockProfileData.name}</ThemedText>
-              <ThemedText style={styles.roleText}>{mockProfileData.role}</ThemedText>
+              <ThemedText style={styles.roleText}>{mockProfileData.role} - {mockProfileData.workInformation.client}</ThemedText>
               <ThemedText style={styles.deptText}>{mockProfileData.departmentInfo}</ThemedText>
             </View>
           </View>
@@ -69,36 +63,31 @@ export default function ProfileScreen() {
           <View style={styles.divider} />
 
           {/* Contact Details List */}
-          <View style={styles.contactList}>
+          <View>
             {/* Email */}
             <View style={styles.contactItem}>
               <View style={styles.contactIconWrapper}>
                 <SymbolView name="envelope" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactLabel}>EMAIL</ThemedText>
                 <ThemedText style={styles.contactValue}>{mockProfileData.contact.email}</ThemedText>
               </View>
             </View>
-
             {/* Phone */}
             <View style={styles.contactItem}>
               <View style={styles.contactIconWrapper}>
                 <SymbolView name="phone" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactLabel}>PHONE</ThemedText>
                 <ThemedText style={styles.contactValue}>{mockProfileData.contact.phone}</ThemedText>
               </View>
             </View>
-
             {/* Location */}
             <View style={styles.contactItem}>
               <View style={styles.contactIconWrapper}>
                 <SymbolView name="mappin.and.ellipse" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactLabel}>LOCATION</ThemedText>
                 <ThemedText style={styles.contactValue}>{mockProfileData.contact.location}</ThemedText>
               </View>
             </View>
@@ -123,7 +112,7 @@ export default function ProfileScreen() {
         </View>
 
         {/* Work Information Card */}
-        <View style={[styles.profileCard, { marginTop: Spacing.four }]}>
+        <View style={styles.profileCard}>
           <ThemedText style={styles.cardTitle}>Work Information</ThemedText>
           <View style={styles.workGrid}>
             <View style={styles.workGridItem}>
@@ -143,18 +132,6 @@ export default function ProfileScreen() {
               <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.branch}</ThemedText>
             </View>
           </View>
-
-          <ThemedText style={styles.cardSubtitle}>Positions</ThemedText>
-          {mockProfileData.workInformation.positions.map((pos, idx) => (
-            <View key={idx} style={styles.positionItem}>
-              <View style={styles.positionAccent} />
-              <View style={styles.positionContent}>
-                <ThemedText style={styles.positionTitle}>{pos.title}</ThemedText>
-                <ThemedText style={styles.positionClient}>Client: {pos.client}</ThemedText>
-                <ThemedText style={styles.positionDetails}>{pos.details}</ThemedText>
-              </View>
-            </View>
-          ))}
 
           <ThemedText style={styles.cardSubtitle}>Roles</ThemedText>
           <View style={styles.rolesRow}>
@@ -264,16 +241,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E1E6',
     marginVertical: Spacing.four,
   },
-  contactList: {
-    gap: Spacing.three,
-  },
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#F0F2F5',
-    borderRadius: Spacing.two,
-    padding: Spacing.three,
+    padding: Spacing.two,
     gap: Spacing.three,
   },
   contactIconWrapper: {
@@ -340,13 +311,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#000000',
-    marginBottom: Spacing.four,
+    marginBottom: Spacing.two,
   },
   cardSubtitle: {
     fontSize: 14,
     fontWeight: '700',
     color: '#60646C',
-    marginTop: Spacing.four,
+    marginTop: Spacing.two,
     marginBottom: Spacing.two,
   },
   workGrid: {
