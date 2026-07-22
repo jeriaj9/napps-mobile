@@ -286,9 +286,6 @@ export default function FeedScreen() {
   // Formatting toolbar states
   const [activeFormats, setActiveFormats] = useState<string[]>([]);
 
-  // Reaction states
-  const [activeReactionPostId, setActiveReactionPostId] = useState<string | null>(null);
-
   // Comments drawer states
   const [activeCommentPost, setActiveCommentPost] = useState<FeedPost | null>(null);
   const [newCommentText, setNewCommentText] = useState('');
@@ -334,56 +331,22 @@ export default function FeedScreen() {
     }, 1000);
   };
 
-  const handleReactToPost = (postId: string, reaction: '👍' | '❤️' | '💡' | '🎉' | '🤔') => {
+  const handleLikePost = (postId: string) => {
     setPosts(
       posts.map((post) => {
         if (post.id === postId) {
-          const reactions = post.reactions || { '👍': post.likes, '❤️': 0, '💡': 0, '🎉': 0, '🤔': 0 };
-          const previousReaction = post.userReaction;
-
-          const newReactions = { ...reactions };
-
-          // If user already had this reaction, toggle it off
-          if (previousReaction === reaction) {
-            newReactions[reaction] = Math.max(0, newReactions[reaction] - 1);
-            return {
-              ...post,
-              liked: false,
-              likes: newReactions['👍'],
-              userReaction: undefined,
-              reactions: newReactions,
-            };
-          }
-
-          // If user had a different reaction, decrement previous reaction
-          if (previousReaction) {
-            newReactions[previousReaction] = Math.max(0, newReactions[previousReaction] - 1);
-          }
-
-          // Increment new reaction
-          newReactions[reaction] = newReactions[reaction] + 1;
-
+          const isLiked = post.liked;
+          const newLiked = !isLiked;
+          const newLikes = newLiked ? post.likes + 1 : Math.max(0, post.likes - 1);
           return {
             ...post,
-            liked: reaction === '👍',
-            likes: newReactions['👍'],
-            userReaction: reaction,
-            reactions: newReactions,
+            liked: newLiked,
+            likes: newLikes,
           };
         }
         return post;
       })
     );
-    setActiveReactionPostId(null);
-  };
-
-  const handleLikePost = (postId: string) => {
-    const post = posts.find((p) => p.id === postId);
-    if (!post) return;
-
-    // Toggle standard '👍' reaction
-    const reactionToApply = post.userReaction === '👍' ? '👍' : (post.userReaction ? post.userReaction : '👍');
-    handleReactToPost(postId, reactionToApply);
   };
 
   const handleAddComment = () => {
@@ -432,8 +395,7 @@ export default function FeedScreen() {
   }, [posts, searchQuery, selectedMonth]);
 
   const renderReactionsText = (item: FeedPost) => {
-    const r = item.reactions || { '👍': item.likes, '❤️': 0, '💡': 0, '🎉': 0, '🤔': 0 };
-    return `👍 ${r['👍']}  ❤️ ${r['❤️']}  💡 ${r['💡']}  🎉 ${r['🎉']}  🤔 ${r['🤔']}  •  ${item.commentsCount} comments`;
+    return `👍 ${item.likes} ${item.likes === 1 ? 'like' : 'likes'}  •  ${item.commentsCount} ${item.commentsCount === 1 ? 'comment' : 'comments'}`;
   };
 
   const renderPostItem = ({ item }: { item: FeedPost }) => {
@@ -497,33 +459,20 @@ export default function FeedScreen() {
 
         {/* Post Footer */}
         <View style={styles.postActions}>
-          {/* React wrap with relative view to position tooltip option box */}
-          <View style={styles.reactButtonWrapper}>
-            {activeReactionPostId === item.id && (
-              <View style={styles.reactionsTooltip}>
-                {(['👍', '❤️', '💡', '🎉', '🤔'] as const).map((emoji) => (
-                  <Pressable
-                    key={emoji}
-                    style={styles.tooltipEmojiPressable}
-                    onPress={() => handleReactToPost(item.id, emoji)}
-                  >
-                    <ThemedText style={styles.tooltipEmojiText}>{emoji}</ThemedText>
-                  </Pressable>
-                ))}
-              </View>
-            )}
-
-            <Pressable
-              style={styles.reactButton}
-              onPress={() => handleLikePost(item.id)}
-              onLongPress={() => setActiveReactionPostId(item.id)}
-              delayLongPress={250}
-            >
-              <ThemedText style={styles.reactButtonText}>
-                {item.userReaction ? `${item.userReaction} React` : '👍 React'}
-              </ThemedText>
-            </Pressable>
-          </View>
+          {/* Like Button */}
+          <Pressable
+            style={[styles.likeButton, item.liked && styles.likeButtonActive]}
+            onPress={() => handleLikePost(item.id)}
+          >
+            <SymbolView
+              name={item.liked ? 'hand.thumbsup.fill' : 'hand.thumbsup'}
+              size={16}
+              tintColor={item.liked ? '#1EBD60' : '#60646C'}
+            />
+            <ThemedText style={[styles.likeButtonText, item.liked && styles.likeButtonTextActive]}>
+              {item.liked ? 'Liked' : 'Like'}
+            </ThemedText>
+          </Pressable>
 
           {/* Comments */}
           <Pressable style={styles.commentButton} onPress={() => setActiveCommentPost(item)}>
@@ -537,12 +486,6 @@ export default function FeedScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: '#F7F8FA' }]}>
-      {activeReactionPostId && (
-        <Pressable
-          style={styles.activeReactionBackdrop}
-          onPress={() => setActiveReactionPostId(null)}
-        />
-      )}
       {/* Unified Screen Header */}
       <ScreenHeader
         title="Feed"
@@ -1244,53 +1187,26 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     alignItems: 'center',
   },
-  reactButtonWrapper: {
-    flex: 3,
-    position: 'relative',
-    zIndex: 99,
-  },
-  reactButton: {
+  likeButton: {
     backgroundColor: '#F0F2F5',
-    width: '100%',
+    flex: 3,
     height: 40,
     borderRadius: 20,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 6,
   },
-  reactButtonText: {
+  likeButtonActive: {
+    backgroundColor: '#E8F5E9',
+  },
+  likeButtonText: {
     fontSize: 14,
     fontWeight: '700',
     color: '#60646C',
   },
-  reactionsTooltip: {
-    position: 'absolute',
-    bottom: 50,
-    left: 0,
-    backgroundColor: '#ffffff',
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    flexDirection: 'row',
-    gap: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
-    zIndex: 99,
-  },
-  tooltipEmojiPressable: {
-    padding: 2,
-  },
-  tooltipEmojiText: {
-    fontSize: 24,
-  },
-  activeReactionBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 10,
-    backgroundColor: 'transparent',
+  likeButtonTextActive: {
+    color: '#1EBD60',
   },
   commentButton: {
     backgroundColor: '#F0F2F5',
