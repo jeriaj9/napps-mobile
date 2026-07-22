@@ -1,7 +1,7 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -92,6 +92,14 @@ export default function BenefitDetailScreen() {
     return 'gift';
   };
 
+  const durationText = typeof benefit.maxUsageDurationMonths === 'number'
+    ? `${benefit.maxUsageDurationMonths} months`
+    : benefit.maxUsageDurationMonths;
+
+  const countText = typeof benefit.maxUsageCount === 'number'
+    ? `${benefit.maxUsageCount} ${benefit.maxUsageCount === 1 ? 'time per employee' : 'times per employee'}`
+    : benefit.maxUsageCount;
+
   return (
     <View style={[styles.container, { backgroundColor: '#F7F8FA' }]}>
       <ScreenHeader title="Benefit Details" onBackPress={() => router.back()} />
@@ -102,15 +110,24 @@ export default function BenefitDetailScreen() {
       >
         {/* Detail Card */}
         <View style={styles.card}>
+          {/* Image Banner / Thumbnail */}
+          {benefit.imageUrl ? (
+            <View style={styles.imageBannerContainer}>
+              <Image source={{ uri: benefit.imageUrl }} style={styles.imageBanner} resizeMode="cover" />
+            </View>
+          ) : null}
+
           {/* Header Row */}
           <View style={styles.headerRow}>
-            <View style={styles.iconWrapper}>
-              <SymbolView
-                name={getBenefitIcon(benefit.title) as any}
-                size={36}
-                tintColor="#1EBD60"
-              />
-            </View>
+            {!benefit.imageUrl && (
+              <View style={styles.iconWrapper}>
+                <SymbolView
+                  name={getBenefitIcon(benefit.title) as any}
+                  size={36}
+                  tintColor="#1EBD60"
+                />
+              </View>
+            )}
             {benefit.isEnjoying ? (
               <View style={styles.activeBadge}>
                 <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
@@ -129,47 +146,47 @@ export default function BenefitDetailScreen() {
           </View>
 
           <ThemedText style={styles.benefitTitle}>{benefit.title}</ThemedText>
-          <ThemedText style={styles.benefitDescription}>{benefit.description}</ThemedText>
+          <ThemedText style={styles.benefitDescription}>{benefit.details || benefit.description}</ThemedText>
 
           <View style={styles.divider} />
 
-          {/* Additional details to look premium */}
+          {/* Structured Eligibility & Usage Grid */}
           <View style={styles.detailsGrid}>
-            <ThemedText style={styles.sectionTitle}>Plan Details</ThemedText>
+            <ThemedText style={styles.sectionTitle}>Eligibility & Usage Limits</ThemedText>
 
             <View style={styles.detailItem}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.detailLabel}>
-                PROVIDER
+                MINIMUM TIME AT COMPANY
               </ThemedText>
               <ThemedText type="smallBold" style={styles.detailValue}>
-                {benefit.title.includes('Insurance') ? 'Blue Cross Blue Shield' : 'Newtech Employee Services'}
+                {benefit.minTimeAtCompany}
               </ThemedText>
             </View>
 
             <View style={styles.detailItem}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.detailLabel}>
-                MONTHLY VALUE
+                MAX USAGE DURATION
               </ThemedText>
               <ThemedText type="smallBold" style={styles.detailValue}>
-                {benefit.title.includes('Insurance') ? '$120.00' : '$45.00 (Company Subsidized)'}
+                {durationText}
               </ThemedText>
             </View>
 
             <View style={styles.detailItem}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.detailLabel}>
-                ELIGIBILITY
+                MAX USAGE COUNT
               </ThemedText>
               <ThemedText type="smallBold" style={styles.detailValue}>
-                Active full-time employees
+                {countText}
               </ThemedText>
             </View>
 
             <View style={styles.detailItem}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.detailLabel}>
-                COVERS
+                PROVIDER / ADMIN
               </ThemedText>
-              <ThemedText type="small" style={styles.detailValue}>
-                Employee + registered dependents
+              <ThemedText type="smallBold" style={styles.detailValue}>
+                Newtech HR & Benefits
               </ThemedText>
             </View>
           </View>
@@ -208,6 +225,7 @@ export default function BenefitDetailScreen() {
     </View>
   );
 }
+
 
 const styles = StyleSheet.create({
   container: {
@@ -254,6 +272,18 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
+    overflow: 'hidden',
+  },
+  imageBannerContainer: {
+    marginHorizontal: -Spacing.four,
+    marginTop: -Spacing.four,
+    marginBottom: Spacing.four,
+    height: 160,
+    backgroundColor: '#E8F5E9',
+  },
+  imageBanner: {
+    width: '100%',
+    height: '100%',
   },
   headerRow: {
     flexDirection: 'row',
