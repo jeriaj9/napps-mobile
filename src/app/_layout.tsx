@@ -15,6 +15,8 @@ export default function RootLayout() {
           <Stack.Screen name="new-ticket" options={{ headerShown: false }} />
           <Stack.Screen name="ticket-detail" options={{ headerShown: false }} />
           <Stack.Screen name="benefit-detail" options={{ headerShown: false }} />
+          <Stack.Screen name="add-skill" options={{ headerShown: false }} />
+          <Stack.Screen name="add-interest" options={{ headerShown: false }} />
         </Stack>
       </ThemeProvider>
     </GestureHandlerRootView>

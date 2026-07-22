@@ -1,44 +1,27 @@
+import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { getProfileData, ProfileData, subscribeProfileChanges } from '@/constants/mockProfileData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-
-const mockProfileData = {
-  initials: 'SL',
-  name: 'SAMUEL LUIS',
-  role: 'Engineer II',
-  departmentInfo: 'Engineering • Joined October 2020',
-  contact: {
-    email: 'samuelluis@outlook.com',
-    phone: '829-570-4634',
-    location: 'Santo Domingo R.D.',
-  },
-  stats: {
-    vacationDays: 12,
-    vacationDaysLabel: 'Remaining',
-    lastQuarterScore: 0,
-    lastQuarterLabel: 'Q1 2026',
-  },
-  workInformation: {
-    startDate: 'October 12, 2020',
-    supervisor: 'JUAN PRADO',
-    vendor: 'Not provided',
-    branch: 'NTG',
-    client: 'Verizon',
-    roles: ['ADMIN', 'SUPERVISOR'],
-  },
-  interests: 'No interests added yet.',
-  skills: [
-    { name: 'XGBoost', rating: 3 },
-    { name: 'Scikit-learn', rating: 2 },
-    { name: 'PyTorch', rating: 1 },
-  ],
-};
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const [profileData, setProfileData] = useState<ProfileData>(getProfileData());
+
+  useFocusEffect(
+    useCallback(() => {
+      setProfileData({ ...getProfileData() });
+      const unsubscribe = subscribeProfileChanges(() => {
+        setProfileData({ ...getProfileData() });
+      });
+      return () => unsubscribe();
+    }, [])
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
@@ -50,12 +33,12 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.headerRow}>
             <View style={styles.avatarBox}>
-              <ThemedText style={styles.avatarText}>{mockProfileData.initials}</ThemedText>
+              <ThemedText style={styles.avatarText}>{profileData.initials}</ThemedText>
             </View>
             <View style={styles.headerInfo}>
-              <ThemedText style={styles.nameText}>{mockProfileData.name}</ThemedText>
-              <ThemedText style={styles.roleText}>{mockProfileData.role} - {mockProfileData.workInformation.client}</ThemedText>
-              <ThemedText style={styles.deptText}>{mockProfileData.departmentInfo}</ThemedText>
+              <ThemedText style={styles.nameText}>{profileData.name}</ThemedText>
+              <ThemedText style={styles.roleText}>{profileData.role} - {profileData.workInformation.client}</ThemedText>
+              <ThemedText style={styles.deptText}>{profileData.departmentInfo}</ThemedText>
             </View>
           </View>
 
@@ -70,7 +53,7 @@ export default function ProfileScreen() {
                 <SymbolView name="envelope" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{mockProfileData.contact.email}</ThemedText>
+                <ThemedText style={styles.contactValue}>{profileData.contact.email}</ThemedText>
               </View>
             </View>
             {/* Phone */}
@@ -79,7 +62,7 @@ export default function ProfileScreen() {
                 <SymbolView name="phone" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{mockProfileData.contact.phone}</ThemedText>
+                <ThemedText style={styles.contactValue}>{profileData.contact.phone}</ThemedText>
               </View>
             </View>
             {/* Location */}
@@ -88,7 +71,7 @@ export default function ProfileScreen() {
                 <SymbolView name="mappin.and.ellipse" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{mockProfileData.contact.location}</ThemedText>
+                <ThemedText style={styles.contactValue}>{profileData.contact.location}</ThemedText>
               </View>
             </View>
           </View>
@@ -99,15 +82,15 @@ export default function ProfileScreen() {
           {/* Vacation Days */}
           <View style={styles.statsCard}>
             <ThemedText style={styles.statsLabel}>VACATION DAYS</ThemedText>
-            <ThemedText style={styles.statsValue}>{mockProfileData.stats.vacationDays}</ThemedText>
-            <ThemedText style={styles.statsSublabel}>{mockProfileData.stats.vacationDaysLabel}</ThemedText>
+            <ThemedText style={styles.statsValue}>{profileData.stats.vacationDays}</ThemedText>
+            <ThemedText style={styles.statsSublabel}>{profileData.stats.vacationDaysLabel}</ThemedText>
           </View>
 
           {/* Last Quarter Score */}
           <View style={styles.statsCard}>
             <ThemedText style={styles.statsLabel}>LAST QUARTER</ThemedText>
-            <ThemedText style={styles.statsValue}>{mockProfileData.stats.lastQuarterScore}%</ThemedText>
-            <ThemedText style={styles.statsSublabel}>{mockProfileData.stats.lastQuarterLabel}</ThemedText>
+            <ThemedText style={styles.statsValue}>{profileData.stats.lastQuarterScore}%</ThemedText>
+            <ThemedText style={styles.statsSublabel}>{profileData.stats.lastQuarterLabel}</ThemedText>
           </View>
         </View>
 
@@ -117,25 +100,25 @@ export default function ProfileScreen() {
           <View style={styles.workGrid}>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>START DATE</ThemedText>
-              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.startDate}</ThemedText>
+              <ThemedText style={styles.gridValue}>{profileData.workInformation.startDate}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>SUPERVISOR</ThemedText>
-              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.supervisor}</ThemedText>
+              <ThemedText style={styles.gridValue}>{profileData.workInformation.supervisor}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>VENDOR</ThemedText>
-              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.vendor}</ThemedText>
+              <ThemedText style={styles.gridValue}>{profileData.workInformation.vendor}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>BRANCH</ThemedText>
-              <ThemedText style={styles.gridValue}>{mockProfileData.workInformation.branch}</ThemedText>
+              <ThemedText style={styles.gridValue}>{profileData.workInformation.branch}</ThemedText>
             </View>
           </View>
 
           <ThemedText style={styles.cardSubtitle}>Roles</ThemedText>
           <View style={styles.rolesRow}>
-            {mockProfileData.workInformation.roles.map((role, idx) => (
+            {profileData.workInformation.roles.map((role, idx) => (
               <View key={idx} style={styles.roleBadge}>
                 <ThemedText style={styles.roleBadgeText}>{role}</ThemedText>
               </View>
@@ -145,23 +128,43 @@ export default function ProfileScreen() {
 
         {/* Interests Card */}
         <View style={styles.profileCard}>
-          <ThemedText style={styles.cardTitle}>Interests</ThemedText>
-          <ThemedText style={styles.interestsText}>{mockProfileData.interests}</ThemedText>
+          <View style={styles.cardHeaderRow}>
+            <ThemedText style={styles.cardTitle}>Interests</ThemedText>
+            <Pressable style={styles.btnAdd} onPress={() => router.push('/add-interest')}>
+              <SymbolView name="plus" size={12} tintColor="#ffffff" />
+            </Pressable>
+          </View>
+          {profileData.interests && profileData.interests.length > 0 ? (
+            <View style={styles.interestsRow}>
+              {profileData.interests.map((interest, idx) => (
+                <View key={idx} style={styles.interestChip}>
+                  <ThemedText style={styles.interestChipText}>{interest}</ThemedText>
+                </View>
+              ))}
+            </View>
+          ) : (
+            <ThemedText style={styles.interestsText}>No interests added yet.</ThemedText>
+          )}
         </View>
 
         {/* Skills & Expertise Card */}
         <View style={styles.profileCard}>
-          <ThemedText style={styles.cardTitle}>Skills & Expertise</ThemedText>
+          <View style={styles.cardHeaderRow}>
+            <ThemedText style={styles.cardTitle}>Skills & Expertise</ThemedText>
+            <Pressable style={styles.btnAdd} onPress={() => router.push('/add-skill')}>
+              <SymbolView name="plus" size={12} tintColor="#ffffff" />
+            </Pressable>
+          </View>
           <View style={styles.skillsRow}>
-            {mockProfileData.skills.map((skill, idx) => (
+            {profileData.skills.map((skill, idx) => (
               <View key={idx} style={styles.skillChip}>
                 <View style={styles.starsRow}>
-                  {[1, 2, 3].map((star) => (
+                  {[1, 2, 3, 4, 5].map((star) => (
                     <SymbolView
                       key={star}
                       name={star <= skill.rating ? 'star.fill' : 'star'}
                       size={10}
-                      tintColor={star <= skill.rating ? '#1EBD60' : '#8E8E93'}
+                      tintColor={star <= skill.rating ? '#1EBD60' : '#C7C7CC'}
                     />
                   ))}
                 </View>
@@ -307,11 +310,24 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
   },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.two,
+  },
   cardTitle: {
     fontSize: 16,
     fontWeight: '700',
     color: '#000000',
-    marginBottom: Spacing.two,
+  },
+  btnAdd: {
+    backgroundColor: '#1EBD60',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   cardSubtitle: {
     fontSize: 14,
@@ -340,32 +356,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
   },
-  positionItem: {
-    flexDirection: 'row',
-    gap: Spacing.three,
-    marginBottom: Spacing.three,
-  },
-  positionAccent: {
-    width: 3,
-    backgroundColor: '#1EBD60',
-    borderRadius: 2,
-  },
-  positionContent: {
-    flex: 1,
-  },
-  positionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#000000',
-  },
-  positionClient: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
-  positionDetails: {
-    fontSize: 12,
-    color: '#8E8E93',
-  },
   rolesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -382,6 +372,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1EBD60',
   },
+  interestsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+    marginTop: 4,
+  },
+  interestChip: {
+    backgroundColor: '#F0F2F5',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  interestChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#4B4D52',
+  },
   interestsText: {
     fontSize: 14,
     color: '#8E8E93',
@@ -390,6 +397,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+    marginTop: 4,
   },
   skillChip: {
     flexDirection: 'row',
@@ -410,3 +418,4 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 });
+
