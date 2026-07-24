@@ -1,4 +1,5 @@
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -40,9 +41,31 @@ export default function TicketDetailScreen() {
     );
   }
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     updateTicketStatus(ticket.id, 'APPROVED');
-    setTicket(prev => prev ? { ...prev, status: 'APPROVED' } : undefined);
+    setTicket((prev) => (prev ? { ...prev, status: 'APPROVED' } : undefined));
+
+    try {
+      const { status } = await Notifications.getPermissionsAsync();
+      let finalStatus = status;
+      if (status !== 'granted') {
+        const { status: askStatus } = await Notifications.requestPermissionsAsync();
+        finalStatus = askStatus;
+      }
+
+      if (finalStatus === 'granted') {
+        await Notifications.scheduleNotificationAsync({
+          content: {
+            title: 'Ticket Approved! 🎟️🎉',
+            body: `Your request "${ticket.requestType}" (${ticket.description || 'Request'}) has been approved by your supervisor.`,
+            sound: true,
+          },
+          trigger: null,
+        });
+      }
+    } catch (e) {
+      console.log('Notification error:', e);
+    }
   };
 
   const handleReject = () => {

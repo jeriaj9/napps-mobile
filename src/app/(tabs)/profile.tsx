@@ -1,11 +1,16 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { getProfileData, ProfileData, subscribeProfileChanges } from '@/constants/mockProfileData';
+import {
+  getProfileData,
+  ProfileData,
+  subscribeProfileChanges,
+  updateNotificationSetting,
+} from '@/constants/mockProfileData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 
 export default function ProfileScreen() {
@@ -173,6 +178,80 @@ export default function ProfileScreen() {
             ))}
           </View>
         </View>
+
+        {/* Notification Settings Card */}
+        <View style={styles.profileCard}>
+          <ThemedText style={styles.cardTitle}>Notification Settings</ThemedText>
+          <ThemedText style={styles.settingsSubtext}>
+            Manage how you receive alerts and status updates across the application.
+          </ThemedText>
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <ThemedText style={styles.settingTitle}>Ticket Approvals & Status</ThemedText>
+              <ThemedText style={styles.settingDesc}>
+                Notify when employee tickets are approved, denied, or updated
+              </ThemedText>
+            </View>
+            <Switch
+              value={profileData.notificationSettings?.ticketApprovals ?? true}
+              onValueChange={(val) => updateNotificationSetting('ticketApprovals', val)}
+              trackColor={{ false: '#E0E1E6', true: '#1EBD60' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+
+          <View style={styles.settingDivider} />
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <ThemedText style={styles.settingTitle}>Benefit Request Alerts</ThemedText>
+              <ThemedText style={styles.settingDesc}>
+                Alerts when enrollment requests are reviewed or completed
+              </ThemedText>
+            </View>
+            <Switch
+              value={profileData.notificationSettings?.benefitRequests ?? true}
+              onValueChange={(val) => updateNotificationSetting('benefitRequests', val)}
+              trackColor={{ false: '#E0E1E6', true: '#1EBD60' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+
+          <View style={styles.settingDivider} />
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <ThemedText style={styles.settingTitle}>Company Feed & Announcements</ThemedText>
+              <ThemedText style={styles.settingDesc}>
+                Push notifications for new company announcements and posts
+              </ThemedText>
+            </View>
+            <Switch
+              value={profileData.notificationSettings?.companyFeed ?? true}
+              onValueChange={(val) => updateNotificationSetting('companyFeed', val)}
+              trackColor={{ false: '#E0E1E6', true: '#1EBD60' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+
+          <View style={styles.settingDivider} />
+
+          <View style={styles.settingRow}>
+            <View style={styles.settingTextContainer}>
+              <ThemedText style={styles.settingTitle}>Device Push Notifications</ThemedText>
+              <ThemedText style={styles.settingDesc}>
+                Allow pop-up notification banners on this device
+              </ThemedText>
+            </View>
+            <Switch
+              value={profileData.notificationSettings?.pushEnabled ?? true}
+              onValueChange={(val) => updateNotificationSetting('pushEnabled', val)}
+              trackColor={{ false: '#E0E1E6', true: '#1EBD60' }}
+              thumbColor="#ffffff"
+            />
+          </View>
+        </View>
       </ScrollView>
     </View>
   );
@@ -321,6 +400,38 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#000000',
   },
+  settingsSubtext: {
+    fontSize: 13,
+    color: '#8E8E93',
+    marginTop: 2,
+    marginBottom: Spacing.three,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 6,
+    gap: Spacing.three,
+  },
+  settingTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  settingTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  settingDesc: {
+    fontSize: 12,
+    color: '#8E8E93',
+    lineHeight: 16,
+  },
+  settingDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#E0E1E6',
+    marginVertical: Spacing.two,
+  },
   btnAdd: {
     backgroundColor: '#1EBD60',
     width: 26,
@@ -418,4 +529,5 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
 });
+
 

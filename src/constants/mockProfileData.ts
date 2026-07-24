@@ -4,6 +4,13 @@ export interface SkillItem {
   rating: number; // 1-5 stars
 }
 
+export interface NotificationSettings {
+  ticketApprovals: boolean;
+  benefitRequests: boolean;
+  companyFeed: boolean;
+  pushEnabled: boolean;
+}
+
 export interface ProfileData {
   initials: string;
   name: string;
@@ -30,6 +37,7 @@ export interface ProfileData {
   };
   interests: string[];
   skills: SkillItem[];
+  notificationSettings: NotificationSettings;
 }
 
 let profileDataState: ProfileData = {
@@ -64,6 +72,12 @@ let profileDataState: ProfileData = {
     { name: 'Scikit-learn', category: 'Data & AI', rating: 2 },
     { name: 'PyTorch', category: 'Data & AI', rating: 3 },
   ],
+  notificationSettings: {
+    ticketApprovals: true,
+    benefitRequests: true,
+    companyFeed: true,
+    pushEnabled: true,
+  },
 };
 
 type Listener = () => void;
@@ -98,6 +112,17 @@ export function addInterestToProfile(interest: string) {
   }
 }
 
+export function updateNotificationSetting<K extends keyof NotificationSettings>(
+  key: K,
+  value: boolean
+) {
+  profileDataState.notificationSettings = {
+    ...profileDataState.notificationSettings,
+    [key]: value,
+  };
+  notifyListeners();
+}
+
 export function subscribeProfileChanges(listener: Listener): () => void {
   listeners.add(listener);
   return () => {
@@ -108,3 +133,4 @@ export function subscribeProfileChanges(listener: Listener): () => void {
 function notifyListeners() {
   listeners.forEach((listener) => listener());
 }
+
