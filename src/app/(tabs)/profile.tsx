@@ -12,11 +12,13 @@ import {
   updateNotificationSetting,
 } from '@/constants/mockProfileData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAuthStore } from '@/store/authStore';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const [profileData, setProfileData] = useState<ProfileData>(getProfileData());
+  const { user, logout } = useAuthStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -28,6 +30,11 @@ export default function ProfileScreen() {
     }, [])
   );
 
+  const handleLogout = async () => {
+    await logout();
+    router.replace('/login');
+  };
+
   return (
     <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
       <ScrollView
@@ -38,12 +45,12 @@ export default function ProfileScreen() {
         <View style={styles.profileCard}>
           <View style={styles.headerRow}>
             <View style={styles.avatarBox}>
-              <ThemedText style={styles.avatarText}>{profileData.initials}</ThemedText>
+              <ThemedText style={styles.avatarText}>{`${user?.firstName[0]}${user?.lastName[0]}`.toUpperCase()}</ThemedText>
             </View>
             <View style={styles.headerInfo}>
-              <ThemedText style={styles.nameText}>{profileData.name}</ThemedText>
-              <ThemedText style={styles.roleText}>{profileData.role} - {profileData.workInformation.client}</ThemedText>
-              <ThemedText style={styles.deptText}>{profileData.departmentInfo}</ThemedText>
+              <ThemedText style={styles.nameText}>{user?.firstName + " " + user?.lastName}</ThemedText>
+              <ThemedText style={styles.roleText}>{user?.positions[0].title}</ThemedText>
+              <ThemedText style={styles.deptText}>{user?.branch + " - " + user?.employeeId}</ThemedText>
             </View>
           </View>
 
@@ -58,7 +65,7 @@ export default function ProfileScreen() {
                 <SymbolView name="envelope" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{profileData.contact.email}</ThemedText>
+                <ThemedText style={styles.contactValue}>{user?.email}</ThemedText>
               </View>
             </View>
             {/* Phone */}
@@ -67,7 +74,7 @@ export default function ProfileScreen() {
                 <SymbolView name="phone" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{profileData.contact.phone}</ThemedText>
+                <ThemedText style={styles.contactValue}>{user?.phoneNumber}</ThemedText>
               </View>
             </View>
             {/* Location */}
@@ -76,7 +83,7 @@ export default function ProfileScreen() {
                 <SymbolView name="mappin.and.ellipse" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{profileData.contact.location}</ThemedText>
+                <ThemedText style={styles.contactValue}>{user?.province.name}</ThemedText>
               </View>
             </View>
           </View>
@@ -105,25 +112,25 @@ export default function ProfileScreen() {
           <View style={styles.workGrid}>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>START DATE</ThemedText>
-              <ThemedText style={styles.gridValue}>{profileData.workInformation.startDate}</ThemedText>
+              <ThemedText style={styles.gridValue}>{user?.startDate}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>SUPERVISOR</ThemedText>
-              <ThemedText style={styles.gridValue}>{profileData.workInformation.supervisor}</ThemedText>
+              <ThemedText style={styles.gridValue}>{user?.reportsTo?.firstName + " " + user?.reportsTo?.lastName}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>VENDOR</ThemedText>
-              <ThemedText style={styles.gridValue}>{profileData.workInformation.vendor}</ThemedText>
+              <ThemedText style={styles.gridValue}>{user?.vendor ?? "Not provided"}</ThemedText>
             </View>
             <View style={styles.workGridItem}>
               <ThemedText style={styles.gridLabel}>BRANCH</ThemedText>
-              <ThemedText style={styles.gridValue}>{profileData.workInformation.branch}</ThemedText>
+              <ThemedText style={styles.gridValue}>{user?.branch ?? "Not provided"}</ThemedText>
             </View>
           </View>
 
           <ThemedText style={styles.cardSubtitle}>Roles</ThemedText>
           <View style={styles.rolesRow}>
-            {profileData.workInformation.roles.map((role, idx) => (
+            {user?.roles?.map((role: any) => role.name || role.roleName).map((role: string, idx: number) => (
               <View key={idx} style={styles.roleBadge}>
                 <ThemedText style={styles.roleBadgeText}>{role}</ThemedText>
               </View>
@@ -139,11 +146,11 @@ export default function ProfileScreen() {
               <SymbolView name="plus" size={12} tintColor="#ffffff" />
             </Pressable>
           </View>
-          {profileData.interests && profileData.interests.length > 0 ? (
+          {user?.interests && user.interests.length > 0 ? (
             <View style={styles.interestsRow}>
-              {profileData.interests.map((interest, idx) => (
+              {user.interests.map((interest: any, idx: any) => (
                 <View key={idx} style={styles.interestChip}>
-                  <ThemedText style={styles.interestChipText}>{interest}</ThemedText>
+                  <ThemedText style={styles.interestChipText}>{interest.name}</ThemedText>
                 </View>
               ))}
             </View>
@@ -161,21 +168,27 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
           <View style={styles.skillsRow}>
-            {profileData.skills.map((skill, idx) => (
-              <View key={idx} style={styles.skillChip}>
-                <View style={styles.starsRow}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <SymbolView
-                      key={star}
-                      name={star <= skill.rating ? 'star.fill' : 'star'}
-                      size={10}
-                      tintColor={star <= skill.rating ? '#1EBD60' : '#C7C7CC'}
-                    />
-                  ))}
+            {user?.skills.map((item: any) => {
+              const stars = item.level === 'advanced' ? 3 : item.level === 'intermediate' ? 2 : 1;
+              return (
+                <View key={item.id} style={styles.skillChip}>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3].map((star) => (
+                      <SymbolView
+                        key={star}
+                        name={star <= stars ? 'star.fill' : 'star'}
+                        size={10}
+                        tintColor={star <= stars ? '#1EBD60' : '#C7C7CC'}
+                      />
+                    ))}
+                  </View>
+
+                  <ThemedText style={styles.skillText}>
+                    {item.skill.name}
+                  </ThemedText>
                 </View>
-                <ThemedText style={styles.skillText}>{skill.name}</ThemedText>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
 
@@ -252,6 +265,16 @@ export default function ProfileScreen() {
             />
           </View>
         </View>
+
+        {/* Logout Button */}
+        <Pressable
+          style={({ pressed }) => [styles.logoutButton, pressed && styles.logoutButtonPressed]}
+          onPress={handleLogout}
+        >
+          <SymbolView name="rectangle.portrait.and.arrow.right" size={20} tintColor="#FF3B30" />
+          <ThemedText style={styles.logoutButtonText}>Log Out</ThemedText>
+        </Pressable>
+
       </ScrollView>
     </View>
   );
@@ -528,6 +551,25 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#000000',
   },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFEBEE',
+    paddingVertical: Spacing.four,
+    borderRadius: Spacing.three,
+    marginTop: Spacing.four,
+    gap: Spacing.two,
+    borderWidth: 1,
+    borderColor: '#FFCDD2',
+  },
+  logoutButtonPressed: {
+    backgroundColor: '#FFCDD2',
+    opacity: 0.9,
+  },
+  logoutButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#FF3B30',
+  },
 });
-
-
