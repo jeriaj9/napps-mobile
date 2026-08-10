@@ -15,13 +15,9 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
+import { API_BASE } from '@/constants/api';
 import { Spacing } from '@/constants/theme';
 import { useAuthStore } from '@/store/authStore';
-
-// Adjust for Android emulator networking if necessary
-const API_BASE =
-  Platform.OS === 'android' ? 'http://10.0.2.2:3000/api/timesheet' : 'http://localhost:3000/api/timesheet';
-// "http://qa.evosphere.nt.core/api/timesheet"
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');

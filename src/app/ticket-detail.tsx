@@ -1,8 +1,8 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -10,21 +10,65 @@ import { ThemedText } from '@/components/themed-text';
 import { TicketProps } from '@/components/tickets/ticket-card';
 import { mockMyTickets, mockPendingRequests, updateTicketStatus } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { fetchTicketById, updateBackendTicketStatus } from '@/services/ticketService';
+import { useAuthStore } from '@/store/authStore';
 
 export default function TicketDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { accessToken } = useAuthStore();
 
-  // Look up the ticket from both collections
-  const findTicket = (): TicketProps | undefined => {
-    const t = mockMyTickets.find((item) => item.id === id) || 
-              mockPendingRequests.find((item) => item.id === id);
-    return t;
-  };
+  const [isLoading, setIsLoading] = useState(true);
+  const [ticket, setTicket] = useState<TicketProps | undefined>(() => {
+    return mockMyTickets.find((item) => item.id === id) ||
+      mockPendingRequests.find((item) => item.id === id);
+  });
 
-  const ticketObj = findTicket();
-  const [ticket, setTicket] = useState<TicketProps | undefined>(ticketObj);
+  useEffect(() => {
+    let isMounted = true;
+    async function loadTicketDetail() {
+      if (!id) {
+        setIsLoading(false);
+        return;
+      }
+
+      if (accessToken) {
+        try {
+          const apiTicket = await fetchTicketById(accessToken, id);
+          if (isMounted && apiTicket) {
+            setTicket(apiTicket);
+            setIsLoading(false);
+            return;
+          }
+        } catch (err) {
+          console.error('Failed to load ticket detail from API:', err);
+        }
+      }
+
+      if (isMounted) {
+        // Fallback to local mock ticket if API fails or token is missing
+        const local = mockMyTickets.find((item) => item.id === id) ||
+          mockPendingRequests.find((item) => item.id === id);
+        if (local) setTicket(local);
+        setIsLoading(false);
+      }
+    }
+
+    loadTicketDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [id, accessToken]);
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA', justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color="#1EBD60" />
+      </View>
+    );
+  }
 
   if (!ticket) {
     return (
@@ -42,6 +86,13 @@ export default function TicketDetailScreen() {
   }
 
   const handleApprove = async () => {
+    if (accessToken) {
+      try {
+        await updateBackendTicketStatus(accessToken, ticket.id, 'resolved', 'Approved via detail view');
+      } catch (e) {
+        console.error('API approve failed in detail view:', e);
+      }
+    }
     updateTicketStatus(ticket.id, 'APPROVED');
     setTicket((prev) => (prev ? { ...prev, status: 'APPROVED' } : undefined));
 
@@ -68,7 +119,14 @@ export default function TicketDetailScreen() {
     }
   };
 
-  const handleReject = () => {
+  const handleReject = async () => {
+    if (accessToken) {
+      try {
+        await updateBackendTicketStatus(accessToken, ticket.id, 'rejected', 'Rejected via detail view');
+      } catch (e) {
+        console.error('API reject failed in detail view:', e);
+      }
+    }
     updateTicketStatus(ticket.id, 'DENIED');
     setTicket(prev => prev ? { ...prev, status: 'DENIED' } : undefined);
   };
@@ -149,17 +207,6 @@ export default function TicketDetailScreen() {
 
           {/* Ticket Information */}
           <View style={styles.infoSection}>
-            {ticket.employee && (
-              <View style={styles.infoRow}>
-                <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
-                  EMPLOYEE
-                </ThemedText>
-                <ThemedText type="smallBold" style={styles.infoValue}>
-                  {ticket.employee.name}
-                </ThemedText>
-              </View>
-            )}
-
             <View style={styles.infoRow}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
                 REQUEST TYPE
@@ -171,12 +218,34 @@ export default function TicketDetailScreen() {
 
             <View style={styles.infoRow}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
-                DATE / RANGE
+                CREATED AT
               </ThemedText>
               <ThemedText type="small" style={styles.infoValue}>
-                {ticket.dateRange || ticket.requestDate}
+                {ticket.createdAt || ticket.requestDate}
               </ThemedText>
             </View>
+
+            {ticket.createdBy && (
+              <View style={styles.infoRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
+                  CREATED BY
+                </ThemedText>
+                <ThemedText type="small" style={styles.infoValue}>
+                  {`${ticket.createdBy.name} (${ticket.createdBy.id})`}
+                </ThemedText>
+              </View>
+            )}
+
+            {ticket.assignedTo && (
+              <View style={styles.infoRow}>
+                <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
+                  ASSIGNED TO
+                </ThemedText>
+                <ThemedText type="small" style={styles.infoValue}>
+                  {`${ticket.assignedTo.name} (${ticket.assignedTo.id})`}
+                </ThemedText>
+              </View>
+            )}
 
             <View style={styles.infoRow}>
               <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
@@ -186,6 +255,22 @@ export default function TicketDetailScreen() {
                 {ticket.priority}
               </ThemedText>
             </View>
+
+            {/* Dynamic Custom Fields (e.g. Dirigido a, Details, Format, etc.) */}
+            {ticket.customFields && Object.keys(ticket.customFields).length > 0 && (
+              <>
+                {Object.entries(ticket.customFields).map(([key, value]) => (
+                  <View style={styles.infoRow} key={key}>
+                    <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
+                      {key.toUpperCase()}
+                    </ThemedText>
+                    <ThemedText type="smallBold" style={styles.infoValue}>
+                      {String(value)}
+                    </ThemedText>
+                  </View>
+                ))}
+              </>
+            )}
           </View>
 
           <View style={styles.divider} />
@@ -193,10 +278,10 @@ export default function TicketDetailScreen() {
           {/* Description Section */}
           <View style={styles.descriptionSection}>
             <ThemedText type="small" themeColor="textSecondary" style={styles.infoLabel}>
-              DESCRIPTION / REASON
+              DESCRIPTION
             </ThemedText>
             <ThemedText style={styles.descriptionText}>
-              {ticket.description || 'No additional details provided.'}
+              {ticket.description || 'No additional description provided.'}
             </ThemedText>
           </View>
 

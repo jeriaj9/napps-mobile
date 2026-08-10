@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -9,35 +9,117 @@ import { ThemedText } from '@/components/themed-text';
 import { TicketCard, TicketProps } from '@/components/tickets/ticket-card';
 import { mockMyTickets, mockPendingRequests, updateTicketStatus } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { fetchEmployeesMap, fetchRequestTypesMap, fetchTicketFields, fetchTickets, mapBackendTicketToTicketProps, updateBackendTicketStatus } from '@/services/ticketService';
+import { useAuthStore } from '@/store/authStore';
 
 export default function TicketsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { ticketCreated } = useLocalSearchParams<{ ticketCreated?: string }>();
+  const { accessToken, user } = useAuthStore();
 
   const [activeTab, setActiveTab] = useState<'myTickets' | 'pendingRequests'>('myTickets');
   const [searchQuery, setSearchQuery] = useState('');
   const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [myTickets, setMyTickets] = useState<TicketProps[]>(mockMyTickets);
   const [pendingRequests, setPendingRequests] = useState<TicketProps[]>(mockPendingRequests);
 
-  useFocusEffect(
-    useCallback(() => {
+  const loadTickets = useCallback(async (isRefresh = false) => {
+    if (!accessToken) {
       setMyTickets([...mockMyTickets]);
       setPendingRequests([...mockPendingRequests]);
-    }, [])
+      return;
+    }
+
+    if (isRefresh) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
+
+    try {
+      const [rawTickets, requestTypesMap, employeesMap] = await Promise.all([
+        fetchTickets(accessToken),
+        fetchRequestTypesMap(accessToken),
+        fetchEmployeesMap(accessToken),
+      ]);
+
+      // Fetch custom fields for tickets in parallel
+      const ticketFieldsPairs = await Promise.all(
+        rawTickets.map(async (t) => {
+          const fields = await fetchTicketFields(accessToken, t.id);
+          return { id: t.id, fields };
+        })
+      );
+      const fieldsMap = new Map(ticketFieldsPairs.map((p) => [p.id, p.fields]));
+
+      const mapped = rawTickets.map((t) =>
+        mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id))
+      );
+      const currentUserId = user?.id || user?.employee_id;
+
+      let my: TicketProps[] = [];
+      let pending: TicketProps[] = [];
+
+      if (currentUserId) {
+        my = rawTickets
+          .filter((t) => t.created_by === currentUserId || t.owner === currentUserId)
+          .map((t) => mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id)));
+
+        pending = rawTickets
+          .filter((t) => t.assigned_to === currentUserId || (t.created_by !== currentUserId && t.owner !== currentUserId))
+          .map((t) => mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id)));
+      } else {
+        my = mapped;
+        pending = mapped.filter((t) => t.status === 'PENDING' || t.status === 'OPEN');
+      }
+
+      setMyTickets(my.length > 0 ? my : mapped);
+      setPendingRequests(pending.length > 0 ? pending : mapped);
+    } catch (error) {
+      console.error('Failed to fetch tickets from backend:', error);
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, [accessToken, user]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadTickets();
+    }, [loadTickets])
   );
 
   const isMyTickets = activeTab === 'myTickets';
 
-  const handleApprove = (id: string) => {
+  const handleApprove = async (id: string) => {
+    if (accessToken) {
+      try {
+        await updateBackendTicketStatus(accessToken, id, 'resolved', 'Approved via mobile app');
+        loadTickets(true);
+        return;
+      } catch (e) {
+        console.error('API Approve failed, falling back to local state:', e);
+      }
+    }
     updateTicketStatus(id, 'APPROVED');
     setPendingRequests([...mockPendingRequests]);
     setMyTickets([...mockMyTickets]);
   };
 
-  const handleReject = (id: string) => {
+  const handleReject = async (id: string) => {
+    if (accessToken) {
+      try {
+        await updateBackendTicketStatus(accessToken, id, 'rejected', 'Rejected via mobile app');
+        loadTickets(true);
+        return;
+      } catch (e) {
+        console.error('API Reject failed, falling back to local state:', e);
+      }
+    }
     updateTicketStatus(id, 'DENIED');
     setPendingRequests([...mockPendingRequests]);
     setMyTickets([...mockMyTickets]);
@@ -196,6 +278,13 @@ export default function TicketsScreen() {
         <FlatList
           data={ticketsData}
           keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl
+              refreshing={isRefreshing}
+              onRefresh={() => loadTickets(true)}
+              tintColor="#1EBD60"
+            />
+          }
           renderItem={({ item }) => (
             <TicketCard
               ticket={item}

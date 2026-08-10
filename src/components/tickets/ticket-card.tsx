@@ -10,11 +10,14 @@ export interface TicketProps {
   status: 'APPROVED' | 'PENDING' | 'DENIED' | 'OPEN' | 'IN PROGRESS' | 'RESOLVED';
   assignedTo?: { name: string; id: string };
   employee?: { name: string; id: string };
+  createdBy?: { name: string; id: string };
   requestType: string;
   priority: 'Low' | 'Medium' | 'High';
   requestDate: string; // Used as submission date, e.g. "May 31"
+  createdAt?: string;
   dateRange?: string; // Used as duration, e.g. "2025-06-22 to 2025-06-29"
   description?: string; // e.g. "Summer vacation"
+  customFields?: Record<string, string>;
   ageSla?: { current: number; limit: number };
 }
 
@@ -90,6 +93,7 @@ export function TicketCard({
     return <ThemedText style={styles.pendingText}>{status}</ThemedText>;
   };
 
+  console.log('ticket in ticket card: ', ticket)
   return (
     <View style={styles.cardContainer}>
       <Pressable style={styles.rowContainer} onPress={handlePress}>
@@ -102,13 +106,13 @@ export function TicketCard({
             />
           </View>
           <View style={styles.textContainer}>
-            {ticket.employee && (
+            {ticket.createdBy && (
               <ThemedText style={styles.employeeText}>
-                {ticket.employee.name}
+                {ticket.createdBy.name}
               </ThemedText>
             )}
             <ThemedText style={styles.descriptionText}>
-              {ticket.description || 'Request Details'}
+              {ticket.requestType || 'Request Details'}
             </ThemedText>
             <ThemedText style={styles.dateText}>
               {ticket.dateRange || ticket.requestDate}

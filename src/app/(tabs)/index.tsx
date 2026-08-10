@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Notifications from 'expo-notifications';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -244,32 +244,32 @@ export default function FeedScreen() {
   // Birthday states
   const [showBirthdayBanner, setShowBirthdayBanner] = useState(true);
 
-  useEffect(() => {
-    if (isBirthdayToday(currentUser.birthday)) {
-      setTimeout(() => setShowBirthdayBanner(true), 0);
+  // useEffect(() => {
+  //   if (isBirthdayToday(currentUser.birthday)) {
+  //     setTimeout(() => setShowBirthdayBanner(true), 0);
 
-      const triggerBirthdayNotification = async () => {
-        const { status } = await Notifications.getPermissionsAsync();
-        let finalStatus = status;
-        if (status !== 'granted') {
-          const { status: askStatus } = await Notifications.requestPermissionsAsync();
-          finalStatus = askStatus;
-        }
-        if (finalStatus === 'granted') {
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: 'Happy Birthday! 🎂🎉',
-              body: `Wishing you a wonderful day, ${currentUser.name}! Enjoy your special day!`,
-              sound: true,
-            },
-            trigger: null,
-          });
-        }
-      };
+  //     const triggerBirthdayNotification = async () => {
+  //       const { status } = await Notifications.getPermissionsAsync();
+  //       let finalStatus = status;
+  //       if (status !== 'granted') {
+  //         const { status: askStatus } = await Notifications.requestPermissionsAsync();
+  //         finalStatus = askStatus;
+  //       }
+  //       if (finalStatus === 'granted') {
+  //         await Notifications.scheduleNotificationAsync({
+  //           content: {
+  //             title: 'Happy Birthday! 🎂🎉',
+  //             body: `Wishing you a wonderful day, ${currentUser.name}! Enjoy your special day!`,
+  //             sound: true,
+  //           },
+  //           trigger: null,
+  //         });
+  //       }
+  //     };
 
-      triggerBirthdayNotification();
-    }
-  }, [currentUser]);
+  //     triggerBirthdayNotification();
+  //   }
+  // }, [currentUser]);
 
   // Feed states
   const [posts, setPosts] = useState<FeedPost[]>(INITIAL_POSTS);
