@@ -1,7 +1,7 @@
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/themed-text';
 import { TicketCard, TicketProps } from '@/components/tickets/ticket-card';
 import { mockMyTickets, mockPendingRequests, updateTicketStatus } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { fetchEmployeesMap, fetchRequestTypesMap, fetchTicketFields, fetchTickets, mapBackendTicketToTicketProps, updateBackendTicketStatus } from '@/services/ticketService';
+import { fetchMyTickets, mapBackendTicketToTicketProps, updateBackendTicketStatus } from '@/services/ticketService';
 import { useAuthStore } from '@/store/authStore';
 
 export default function TicketsScreen() {
@@ -41,24 +41,11 @@ export default function TicketsScreen() {
     }
 
     try {
-      const [rawTickets, requestTypesMap, employeesMap] = await Promise.all([
-        fetchTickets(accessToken),
-        fetchRequestTypesMap(accessToken),
-        fetchEmployeesMap(accessToken),
-      ]);
+      console.log('user: ', user);
+      const rawTickets = await fetchMyTickets(accessToken, user.id);
+      console.log('raw tickets: ', rawTickets);
 
-      // Fetch custom fields for tickets in parallel
-      const ticketFieldsPairs = await Promise.all(
-        rawTickets.map(async (t) => {
-          const fields = await fetchTicketFields(accessToken, t.id);
-          return { id: t.id, fields };
-        })
-      );
-      const fieldsMap = new Map(ticketFieldsPairs.map((p) => [p.id, p.fields]));
-
-      const mapped = rawTickets.map((t) =>
-        mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id))
-      );
+      const mapped = rawTickets.map((t) => mapBackendTicketToTicketProps(t));
       const currentUserId = user?.id || user?.employee_id;
 
       let my: TicketProps[] = [];
@@ -66,12 +53,21 @@ export default function TicketsScreen() {
 
       if (currentUserId) {
         my = rawTickets
-          .filter((t) => t.created_by === currentUserId || t.owner === currentUserId)
-          .map((t) => mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id)));
+          .filter((t) => {
+            const createdById = t.created_by && (typeof t.created_by === 'object' ? t.created_by.id : t.created_by);
+            const ownerId = t.owner && (typeof t.owner === 'object' ? t.owner.id : t.owner);
+            return createdById == currentUserId || ownerId == currentUserId;
+          })
+          .map((t) => mapBackendTicketToTicketProps(t));
 
         pending = rawTickets
-          .filter((t) => t.assigned_to === currentUserId || (t.created_by !== currentUserId && t.owner !== currentUserId))
-          .map((t) => mapBackendTicketToTicketProps(t, requestTypesMap, employeesMap, fieldsMap.get(t.id)));
+          .filter((t) => {
+            const assignedToId = t.assigned_to && (typeof t.assigned_to === 'object' ? t.assigned_to.id : t.assigned_to);
+            const createdById = t.created_by && (typeof t.created_by === 'object' ? t.created_by.id : t.created_by);
+            const ownerId = t.owner && (typeof t.owner === 'object' ? t.owner.id : t.owner);
+            return assignedToId == currentUserId || (createdById != currentUserId && ownerId != currentUserId);
+          })
+          .map((t) => mapBackendTicketToTicketProps(t));
       } else {
         my = mapped;
         pending = mapped.filter((t) => t.status === 'PENDING' || t.status === 'OPEN');
@@ -433,6 +429,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   flatListCard: {
+    flex: 1,
     marginHorizontal: Spacing.four,
     borderRadius: Spacing.three,
     backgroundColor: '#ffffff',

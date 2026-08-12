@@ -83,7 +83,7 @@ export default function ProfileScreen() {
                 <SymbolView name="mappin.and.ellipse" size={18} tintColor="#1EBD60" />
               </View>
               <View style={styles.contactTextWrapper}>
-                <ThemedText style={styles.contactValue}>{user?.province.name}</ThemedText>
+                <ThemedText style={styles.contactValue}>{user?.province?.name}</ThemedText>
               </View>
             </View>
           </View>
