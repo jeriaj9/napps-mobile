@@ -35,7 +35,7 @@ export function TicketCard({
   const handlePress = () => {
     router.push({
       pathname: '/ticket-detail',
-      params: { id: ticket.id },
+      params: { ticket: JSON.stringify(ticket) },
     });
   };
 

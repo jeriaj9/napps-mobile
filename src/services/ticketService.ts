@@ -76,11 +76,9 @@ export async function fetchMyTickets(token: string, employeeId: string): Promise
   }
 
   const result = await response.json();
-  console.log('NEW TICKETS DATA: ', result?.data.tickets);
-  if (result.data) {
-    return result.data.tickets;
-  }
-  return [];
+  console.log('NEW TICKETS RESULT: ', result);
+  console.log('NEW TICKETS DATA: ', result?.tickets);
+  return result.tickets;
 }
 
 /**
@@ -213,7 +211,7 @@ export async function fetchTicketById(token: string, ticketId: string | number):
       fetchRequestTypesMap(token),
       fetchEmployeesMap(token),
       fetchTicketFields(token, rawTicket.id),
-      fetchCustomFieldsDefs(token, rawTicket.request_type_id),
+      fetchCustomFieldsDefs(token, rawTicket?.request_type_id as any),
     ]);
 
     const mapped = mapBackendTicketToTicketProps(rawTicket, requestTypesMap, employeesMap, customFieldsValues);

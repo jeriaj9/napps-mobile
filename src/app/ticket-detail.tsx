@@ -1,74 +1,35 @@
 import * as Notifications from 'expo-notifications';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
 import { TicketProps } from '@/components/tickets/ticket-card';
-import { mockMyTickets, mockPendingRequests, updateTicketStatus } from '@/constants/mockTicketsData';
+import { updateTicketStatus } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { fetchTicketById, updateBackendTicketStatus } from '@/services/ticketService';
+import { updateBackendTicketStatus } from '@/services/ticketService';
 import { useAuthStore } from '@/store/authStore';
 
 export default function TicketDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { ticket: ticketParam } = useLocalSearchParams<{ ticket?: string }>();
   const { accessToken } = useAuthStore();
 
-  const [isLoading, setIsLoading] = useState(true);
-  const [ticket, setTicket] = useState<TicketProps | undefined>(() => {
-    return mockMyTickets.find((item) => item.id === id) ||
-      mockPendingRequests.find((item) => item.id === id);
-  });
-
-  useEffect(() => {
-    let isMounted = true;
-    async function loadTicketDetail() {
-      if (!id) {
-        setIsLoading(false);
-        return;
-      }
-
-      if (accessToken) {
-        try {
-          const apiTicket = await fetchTicketById(accessToken, id);
-          if (isMounted && apiTicket) {
-            setTicket(apiTicket);
-            setIsLoading(false);
-            return;
-          }
-        } catch (err) {
-          console.error('Failed to load ticket detail from API:', err);
-        }
-      }
-
-      if (isMounted) {
-        // Fallback to local mock ticket if API fails or token is missing
-        const local = mockMyTickets.find((item) => item.id === id) ||
-          mockPendingRequests.find((item) => item.id === id);
-        if (local) setTicket(local);
-        setIsLoading(false);
-      }
+  const initialTicket = useMemo(() => {
+    if (!ticketParam) return undefined;
+    try {
+      return typeof ticketParam === 'string' ? JSON.parse(ticketParam) : ticketParam;
+    } catch (err) {
+      console.error('Failed to parse ticket param:', err);
+      return undefined;
     }
+  }, [ticketParam]);
 
-    loadTicketDetail();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [id, accessToken]);
-
-  if (isLoading) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA', justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color="#1EBD60" />
-      </View>
-    );
-  }
+  const [ticket, setTicket] = useState<TicketProps | undefined>(initialTicket);
 
   if (!ticket) {
     return (
@@ -291,13 +252,13 @@ export default function TicketDetailScreen() {
               <Pressable style={[styles.btnAction, styles.approveBtn]} onPress={handleApprove}>
                 <SymbolView name="checkmark" size={16} tintColor="#388E3C" />
                 <ThemedText type="smallBold" style={{ color: '#388E3C' }}>
-                  Approve Request
+                  Approve
                 </ThemedText>
               </Pressable>
               <Pressable style={[styles.btnAction, styles.rejectBtn]} onPress={handleReject}>
                 <SymbolView name="xmark" size={16} tintColor="#D32F2F" />
                 <ThemedText type="smallBold" style={{ color: '#D32F2F' }}>
-                  Reject Request
+                  Reject
                 </ThemedText>
               </Pressable>
             </View>
@@ -358,6 +319,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 2,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
@@ -391,16 +353,23 @@ const styles = StyleSheet.create({
   infoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
+    gap: Spacing.three,
+    width: '100%',
   },
   infoLabel: {
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.5,
+    flexShrink: 0,
   },
   infoValue: {
     fontSize: 14,
     color: '#000000',
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
+    textAlign: 'right',
   },
   descriptionSection: {
     gap: Spacing.two,
