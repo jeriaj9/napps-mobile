@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -14,9 +14,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
+import {
+  DynamicFormFields,
+  cleanDefaultValue,
+  parseCustomFieldOptions,
+} from '@/components/tickets/DynamicFormFields';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-
-type TicketType = 'vacation' | 'licence' | 'letter' | 'overtime';
+import {
+  CustomField,
+  RequestType,
+  TicketCategory,
+  createTicket,
+  fetchTicketsCategories,
+} from '@/services/ticketService';
+import { useAuthStore } from '@/store/authStore';
 
 interface Attachment {
   id: string;
@@ -31,422 +42,410 @@ const MOCK_FILES: Attachment[] = [
   { id: '4', name: 'visa_document_scan.jpg', size: '890 KB' },
 ];
 
+function getIconForCategoryOrRequest(categoryName: string, requestTypeName: string, iconStr?: string) {
+  const combined = `${categoryName} ${requestTypeName} ${iconStr || ''}`.toLowerCase();
+
+  if (combined.includes('vacation') || combined.includes('vacaciones')) {
+    return { name: 'calendar' as const, bg: '#E8F5E9', tint: '#1EBD60' };
+  }
+  if (combined.includes('sick') || combined.includes('licence') || combined.includes('salud') || combined.includes('heart')) {
+    return { name: 'heart' as const, bg: '#FFEBEE', tint: '#FF3B30' };
+  }
+  if (combined.includes('ot') || combined.includes('overtime') || combined.includes('extra') || combined.includes('clock')) {
+    return { name: 'clock' as const, bg: '#FFF3E0', tint: '#FF9500' };
+  }
+  if (combined.includes('hr') || combined.includes('users') || combined.includes('carta') || combined.includes('letter') || combined.includes('document')) {
+    return { name: 'doc.text' as const, bg: '#E3F2FD', tint: '#007AFF' };
+  }
+  if (combined.includes('textbox') || combined.includes('cusfield') || combined.includes('test') || combined.includes('custom')) {
+    return { name: 'square.and.pencil' as const, bg: '#F3E5F5', tint: '#9C27B0' };
+  }
+  return { name: 'folder' as const, bg: '#EBF8FF', tint: '#3182CE' };
+}
+
 export default function NewTicketScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { accessToken } = useAuthStore();
 
   // Navigation step state: 'select' | 'form'
   const [step, setStep] = useState<'select' | 'form'>('select');
 
-  // Shared form states
-  const [ticketType, setTicketType] = useState<TicketType>('vacation');
-  const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
+  // Categories state from API
+  const [categories, setCategories] = useState<TicketCategory[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
 
-  // Vacation fields
-  const [startDate, setStartDate] = useState<string | null>(null);
-  const [endDate, setEndDate] = useState<string | null>(null);
-  const [showDatePickerModal, setShowDatePickerModal] = useState(false);
-  const [selectingDateType, setSelectingDateType] = useState<'start' | 'end'>('start');
+  // Selected state
+  const [selectedCategory, setSelectedCategory] = useState<TicketCategory | null>(null);
+  const [selectedRequestType, setSelectedRequestType] = useState<RequestType | null>(null);
 
-  // Sick Leave (Licence) fields
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [showAttachmentModal, setShowAttachmentModal] = useState(false);
+  // Dynamic form state
+  const [dynamicValues, setDynamicValues] = useState<Record<number, any>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<number, string>>({});
+  const [attachmentsByField, setAttachmentsByField] = useState<Record<number, Attachment[]>>({});
+  const [generalComment, setGeneralComment] = useState<string>('');
 
-  // Letter of Employment fields
-  const [purpose, setPurpose] = useState('');
-  const [deliveryMethod, setDeliveryMethod] = useState<'digital' | 'printed'>('digital');
+  // Date Picker Modal state
+  const [showDatePickerModal, setShowDatePickerModal] = useState<boolean>(false);
+  const [activeDateFieldId, setActiveDateFieldId] = useState<number | null>(null);
+  const [isSelectingRange, setIsSelectingRange] = useState<boolean>(false);
+  const [rangeStartDate, setRangeStartDate] = useState<string | null>(null);
 
-  // Overtime fields
-  const [overtimeDate, setOvertimeDate] = useState<string | null>(null);
-  const [overtimeHours, setOvertimeHours] = useState('');
+  // Attachment Modal state
+  const [showAttachmentModal, setShowAttachmentModal] = useState<boolean>(false);
+  const [activeFileFieldId, setActiveFileFieldId] = useState<number | null>(null);
 
-  // Submit states
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  // Submit loading
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleSelectMockFile = (file: Attachment) => {
-    if (!attachments.some((item) => item.id === file.id)) {
-      setAttachments([...attachments, file]);
+  // Load ticket categories strictly from API
+  const loadCategories = useCallback(async () => {
+    setIsLoadingCategories(true);
+    try {
+      if (accessToken) {
+        const fetched = await fetchTicketsCategories(accessToken);
+        setCategories(fetched || []);
+      } else {
+        setCategories([]);
+      }
+    } catch (err) {
+      console.error('Error fetching ticket categories from API:', err);
+      setCategories([]);
+    } finally {
+      setIsLoadingCategories(false);
     }
-    setShowAttachmentModal(false);
-    if (errors.attachments) {
-      setErrors((prev) => {
+  }, [accessToken]);
+
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  // Handle selecting a Request Type
+  const handleSelectRequestType = (category: TicketCategory, reqType: RequestType) => {
+    setSelectedCategory(category);
+    setSelectedRequestType(reqType);
+    setGeneralComment('');
+    setFieldErrors({});
+
+    // Pre-populate default values from custom_fields
+    const initialVals: Record<number, any> = {};
+    if (reqType.custom_fields && reqType.custom_fields.length > 0) {
+      reqType.custom_fields.forEach((field) => {
+        const cleaned = cleanDefaultValue(field.default_value);
+        if (cleaned) {
+          initialVals[field.id] = cleaned;
+        }
+      });
+    }
+    setDynamicValues(initialVals);
+    setStep('form');
+  };
+
+  // Change single field value
+  const handleChangeField = (fieldId: number, value: any) => {
+    setDynamicValues((prev) => ({
+      ...prev,
+      [fieldId]: value,
+    }));
+    if (fieldErrors[fieldId]) {
+      setFieldErrors((prev) => {
         const copy = { ...prev };
-        delete copy.attachments;
+        delete copy[fieldId];
         return copy;
       });
     }
   };
 
-  const handleRemoveAttachment = (id: string) => {
-    setAttachments(attachments.filter((item) => item.id !== id));
-  };
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!title.trim()) {
-      newErrors.title = 'Title is required';
-    }
-    if (!message.trim()) {
-      newErrors.message = 'Description/Message is required';
-    }
-
-    if (ticketType === 'vacation') {
-      if (!startDate) {
-        newErrors.startDate = 'Start date is required';
-      }
-      if (!endDate) {
-        newErrors.endDate = 'End date is required';
-      }
-      if (startDate && endDate) {
-        const startDay = parseInt(startDate.split(' ')[1], 10);
-        const endDay = parseInt(endDate.split(' ')[1], 10);
-        if (endDay <= startDay) {
-          newErrors.endDate = 'End date must be after start date';
-        }
-      }
-    } else if (ticketType === 'licence') {
-      if (attachments.length === 0) {
-        newErrors.attachments = 'Supporting medical document is required';
-      }
-    } else if (ticketType === 'letter') {
-      if (!purpose.trim()) {
-        newErrors.purpose = 'Purpose of the letter is required';
-      }
-    } else if (ticketType === 'overtime') {
-      if (!overtimeDate) {
-        newErrors.overtimeDate = 'Overtime date is required';
-      }
-      if (!overtimeHours.trim()) {
-        newErrors.overtimeHours = 'Hours are required';
-      }
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = () => {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
-      router.replace('/(tabs)/tickets?ticketCreated=true');
-    }, 1200);
+  // Date Modal handlers
+  const handleOpenDatePicker = (fieldId: number, isRange = false) => {
+    setActiveDateFieldId(fieldId);
+    setIsSelectingRange(isRange);
+    setRangeStartDate(null);
+    setShowDatePickerModal(true);
   };
 
   const juneDays = Array.from({ length: 30 }, (_, i) => i + 1);
 
-  const handleSelectDay = (day: number) => {
-    const formattedDate = `June ${day}, 2026`;
+  const handleSelectCalendarDay = (day: number) => {
+    if (!activeDateFieldId) return;
 
-    if (selectingDateType === 'start') {
-      setStartDate(formattedDate);
-      if (errors.startDate) {
-        setErrors((prev) => {
-          const copy = { ...prev };
-          delete copy.startDate;
-          return copy;
-        });
+    const formatted = `06/${day < 10 ? '0' + day : day}/2026`;
+
+    if (isSelectingRange) {
+      if (!rangeStartDate) {
+        setRangeStartDate(formatted);
+      } else {
+        const rangeStr = `${rangeStartDate},${formatted}`;
+        handleChangeField(activeDateFieldId, rangeStr);
+        setShowDatePickerModal(false);
+        setRangeStartDate(null);
       }
-      setShowDatePickerModal(false);
     } else {
-      setEndDate(formattedDate);
-      if (errors.endDate) {
-        setErrors((prev) => {
-          const copy = { ...prev };
-          delete copy.endDate;
-          return copy;
-        });
-      }
+      handleChangeField(activeDateFieldId, formatted);
       setShowDatePickerModal(false);
     }
   };
 
-  const selectOption = (type: TicketType) => {
-    setTicketType(type);
-    setErrors({});
+  // File Attachment Modal handlers
+  const handleOpenAttachmentPicker = (fieldId: number) => {
+    setActiveFileFieldId(fieldId);
+    setShowAttachmentModal(true);
+  };
 
-    // Set default titles for convenience
-    if (type === 'vacation') {
-      setTitle('Request Vacation Days');
-    } else if (type === 'licence') {
-      setTitle('Request Sick Leave');
-    } else if (type === 'overtime') {
-      setTitle('Request Overtime Compensation');
-    } else if (type === 'letter') {
-      setTitle('Request Employment Letter');
+  const handleSelectMockFile = (file: Attachment) => {
+    if (!activeFileFieldId) return;
+    const currentList = attachmentsByField[activeFileFieldId] || [];
+    if (!currentList.some((item) => item.id === file.id)) {
+      const updated = [...currentList, file];
+      setAttachmentsByField((prev) => ({
+        ...prev,
+        [activeFileFieldId]: updated,
+      }));
+      handleChangeField(activeFileFieldId, file.name);
     }
+    setShowAttachmentModal(false);
+  };
 
-    setStep('form');
+  const handleRemoveAttachment = (fieldId: number, attachmentId: string) => {
+    const currentList = attachmentsByField[fieldId] || [];
+    const updated = currentList.filter((item) => item.id !== attachmentId);
+    setAttachmentsByField((prev) => ({
+      ...prev,
+      [fieldId]: updated,
+    }));
+    if (updated.length === 0) {
+      handleChangeField(fieldId, '');
+    } else {
+      handleChangeField(fieldId, updated.map((f) => f.name).join(', '));
+    }
+  };
+
+  // Form Validation
+  const validateDynamicForm = (): boolean => {
+    if (!selectedRequestType) return false;
+    const errors: Record<number, string> = {};
+    const fields = selectedRequestType.custom_fields || [];
+
+    fields.forEach((field) => {
+      const val = dynamicValues[field.id];
+
+      // Required check
+      if (field.is_required) {
+        if (val === undefined || val === null || String(val).trim() === '') {
+          errors[field.id] = `${field.label} is required`;
+          return;
+        }
+      }
+
+      // Number validations
+      if (field.type === 'number' && val !== undefined && val !== null && String(val).trim() !== '') {
+        const num = Number(val);
+        if (isNaN(num)) {
+          errors[field.id] = `${field.label} must be a valid number`;
+        } else {
+          const optionsObj = parseCustomFieldOptions(field.options);
+          if (optionsObj) {
+            if (optionsObj.min !== undefined && num < optionsObj.min) {
+              errors[field.id] = `Minimum value is ${optionsObj.min}`;
+            }
+            if (optionsObj.max !== undefined && num > optionsObj.max) {
+              errors[field.id] = `Maximum value is ${optionsObj.max}`;
+            }
+          }
+        }
+      }
+    });
+
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Form Submit
+  const handleSubmit = async () => {
+    if (!validateDynamicForm() || !selectedRequestType) return;
+
+    setIsSubmitting(true);
+    try {
+      const customFieldsPayload = Object.entries(dynamicValues).map(([idStr, value]) => ({
+        custom_field_id: Number(idStr),
+        value: String(value),
+      }));
+
+      if (accessToken) {
+        await createTicket(accessToken, {
+          request_type_id: selectedRequestType.id,
+          comment: generalComment,
+          priority: selectedRequestType.priority || 'medium',
+          custom_fields: customFieldsPayload,
+        });
+      }
+    } catch (err) {
+      console.error('Failed to submit ticket:', err);
+    } finally {
+      setIsSubmitting(false);
+      router.replace('/(tabs)/tickets?ticketCreated=true');
+    }
   };
 
   const renderSelectStep = () => {
     return (
       <View style={styles.stepContainer}>
-        <ScreenHeader
-          title="New Request"
-          onBackPress={() => router.back()}
-        />
+        <ScreenHeader title="New Request" onBackPress={() => router.back()} />
         <View style={styles.selectHeader}>
-          <ThemedText style={styles.selectHeaderText}>Select a request type to get started</ThemedText>
+          <ThemedText style={styles.selectHeaderText}>
+            Select a request type to get started
+          </ThemedText>
         </View>
 
-        <View style={styles.optionsCard}>
-          {/* Vacation Days */}
-          <Pressable style={styles.optionRow} onPress={() => selectOption('vacation')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#E8F5E9' }]}>
-              <SymbolView name="calendar" size={22} tintColor="#1EBD60" />
-            </View>
-            <View style={styles.optionTextWrapper}>
-              <ThemedText style={styles.optionTitle}>Vacation Days</ThemedText>
-              <ThemedText style={styles.optionDesc}>Request time off for vacation</ThemedText>
-            </View>
-            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
-          </Pressable>
+        {isLoadingCategories ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#1EBD60" />
+            <ThemedText style={styles.loadingText}>Loading request categories...</ThemedText>
+          </View>
+        ) : categories.length === 0 ? (
+          <View style={styles.emptyCategoriesContainer}>
+            <SymbolView name="exclamationmark.triangle" size={32} tintColor="#8E8E93" />
+            <ThemedText style={styles.emptyCategoriesTitle}>No Request Categories Found</ThemedText>
+            <ThemedText style={styles.emptyCategoriesSubtitle}>
+              Unable to load request categories from the API. Please try again.
+            </ThemedText>
+            <Pressable style={styles.retryBtn} onPress={loadCategories}>
+              <ThemedText style={styles.retryBtnText}>Retry</ThemedText>
+            </Pressable>
+          </View>
+        ) : (
+          <ScrollView
+            contentContainerStyle={[
+              styles.categoriesScrollContent,
+              { paddingBottom: insets.bottom + Spacing.six },
+            ]}
+            showsVerticalScrollIndicator={false}
+          >
+            {categories.map((category) => {
+              const requestTypes = category.request_types || [];
+              if (requestTypes.length === 0) return null;
 
-          <View style={styles.optionDivider} />
+              return (
+                <View key={category.id} style={styles.categorySection}>
+                  <ThemedText style={styles.categorySectionHeader}>
+                    {category.name.toUpperCase()}
+                  </ThemedText>
 
-          {/* Sick Leave */}
-          <Pressable style={styles.optionRow} onPress={() => selectOption('licence')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#FFEBEE' }]}>
-              <SymbolView name="heart" size={20} tintColor="#FF3B30" />
-            </View>
-            <View style={styles.optionTextWrapper}>
-              <ThemedText style={styles.optionTitle}>Sick Leave</ThemedText>
-              <ThemedText style={styles.optionDesc}>Report sick leave absence</ThemedText>
-            </View>
-            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
-          </Pressable>
+                  <View style={styles.optionsCard}>
+                    {requestTypes.map((reqType, index) => {
+                      const iconConfig = getIconForCategoryOrRequest(
+                        category.name,
+                        reqType.name,
+                        category.icon
+                      );
 
-          <View style={styles.optionDivider} />
+                      return (
+                        <React.Fragment key={reqType.id}>
+                          <Pressable
+                            style={styles.optionRow}
+                            onPress={() => handleSelectRequestType(category, reqType)}
+                          >
+                            <View
+                              style={[
+                                styles.optionIconWrapper,
+                                { backgroundColor: iconConfig.bg },
+                              ]}
+                            >
+                              <SymbolView
+                                name={iconConfig.name}
+                                size={20}
+                                tintColor={iconConfig.tint}
+                              />
+                            </View>
+                            <View style={styles.optionTextWrapper}>
+                              <ThemedText style={styles.optionTitle}>{reqType.name}</ThemedText>
+                              <ThemedText style={styles.optionDesc}>
+                                {reqType.description || category.description || 'Submit request'}
+                              </ThemedText>
+                            </View>
+                            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
+                          </Pressable>
 
-          {/* Overtime */}
-          <Pressable style={styles.optionRow} onPress={() => selectOption('overtime')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#FFF3E0' }]}>
-              <SymbolView name="clock" size={20} tintColor="#FF9500" />
-            </View>
-            <View style={styles.optionTextWrapper}>
-              <ThemedText style={styles.optionTitle}>Overtime</ThemedText>
-              <ThemedText style={styles.optionDesc}>Request overtime compensation</ThemedText>
-            </View>
-            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
-          </Pressable>
-
-          <View style={styles.optionDivider} />
-
-          {/* Company Letter */}
-          <Pressable style={styles.optionRow} onPress={() => selectOption('letter')}>
-            <View style={[styles.optionIconWrapper, { backgroundColor: '#E3F2FD' }]}>
-              <SymbolView name="doc.text" size={20} tintColor="#007AFF" />
-            </View>
-            <View style={styles.optionTextWrapper}>
-              <ThemedText style={styles.optionTitle}>Company Letter</ThemedText>
-              <ThemedText style={styles.optionDesc}>Request official company letter</ThemedText>
-            </View>
-            <SymbolView name="chevron.right" size={16} tintColor="#8E8E93" />
-          </Pressable>
-        </View>
+                          {index < requestTypes.length - 1 && (
+                            <View style={styles.optionDivider} />
+                          )}
+                        </React.Fragment>
+                      );
+                    })}
+                  </View>
+                </View>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
     );
   };
 
-  const getFormTitle = () => {
-    switch (ticketType) {
-      case 'vacation': return 'Request Vacation Days';
-      case 'licence': return 'Request Sick Leave';
-      case 'overtime': return 'Request Overtime';
-      case 'letter': return 'Request Company Letter';
-    }
-  };
-
   const renderFormStep = () => {
+    if (!selectedRequestType) return null;
+
+    const fields = selectedRequestType.custom_fields || [];
+
     return (
       <View style={styles.stepContainer}>
         <ScreenHeader
-          title={getFormTitle()}
+          title={selectedRequestType.name}
           onBackPress={() => setStep('select')}
         />
 
         <ScrollView
-          contentContainerStyle={[styles.formScrollContent, { paddingBottom: insets.bottom + Spacing.six }]}
+          contentContainerStyle={[
+            styles.formScrollContent,
+            { paddingBottom: insets.bottom + Spacing.six },
+          ]}
           showsVerticalScrollIndicator={false}
         >
-          {/* Vacation Days Available Circular Progress Gauge */}
-          {ticketType === 'vacation' && (
-            <View style={styles.gaugeContainer}>
-              <View style={styles.gaugeCircle}>
-                <ThemedText style={styles.gaugeNumber}>12</ThemedText>
-                <ThemedText style={styles.gaugeLabel}>DAYS AVAILABLE</ThemedText>
-              </View>
-              <View style={styles.gaugeStatsRow}>
-                <ThemedText style={styles.gaugeStatText}>Used this year</ThemedText>
-                <ThemedText style={styles.gaugeStatValue}>8 days</ThemedText>
-              </View>
-              <View style={styles.gaugeStatsDivider} />
-              <View style={styles.gaugeStatsRow}>
-                <ThemedText style={styles.gaugeStatText}>Total allocation</ThemedText>
-                <ThemedText style={styles.gaugeStatValue}>20 days</ThemedText>
-              </View>
+          {/* Metadata Banner */}
+          <View style={styles.metaBanner}>
+            <View style={styles.metaBadge}>
+              <SymbolView name="clock" size={14} tintColor="#007AFF" />
+              <ThemedText style={styles.metaBadgeText}>
+                SLA: {selectedRequestType.sla ? `${selectedRequestType.sla} days` : 'Standard'}
+              </ThemedText>
             </View>
-          )}
+            <View style={[styles.metaBadge, { backgroundColor: '#FFF3E0' }]}>
+              <SymbolView name="exclamationmark.circle" size={14} tintColor="#FF9500" />
+              <ThemedText style={[styles.metaBadgeText, { color: '#FF9500' }]}>
+                Priority: {(selectedRequestType.priority || 'Medium').toUpperCase()}
+              </ThemedText>
+            </View>
+          </View>
 
           {/* Form Content Card */}
           <View style={styles.formCard}>
-            {/* Vacation Dates selection fields */}
-            {ticketType === 'vacation' && (
-              <View style={styles.formSection}>
-                <ThemedText style={styles.inputLabel}>FROM</ThemedText>
-                <Pressable
-                  style={[styles.dateInputButton, errors.startDate && styles.inputErrorBorder]}
-                  onPress={() => {
-                    setSelectingDateType('start');
-                    setShowDatePickerModal(true);
-                  }}
-                >
-                  <ThemedText style={[styles.dateInputText, !startDate && { color: '#9E9E9E' }]}>
-                    {startDate || 'mm/dd/yyyy'}
-                  </ThemedText>
-                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
-                </Pressable>
-                {errors.startDate ? <ThemedText style={styles.errorText}>{errors.startDate}</ThemedText> : null}
-
-                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>TO</ThemedText>
-                <Pressable
-                  style={[styles.dateInputButton, errors.endDate && styles.inputErrorBorder]}
-                  onPress={() => {
-                    setSelectingDateType('end');
-                    setShowDatePickerModal(true);
-                  }}
-                >
-                  <ThemedText style={[styles.dateInputText, !endDate && { color: '#9E9E9E' }]}>
-                    {endDate || 'mm/dd/yyyy'}
-                  </ThemedText>
-                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
-                </Pressable>
-                {errors.endDate ? <ThemedText style={styles.errorText}>{errors.endDate}</ThemedText> : null}
-              </View>
-            )}
-
-            {/* Sick Leave / Attachment upload fields */}
-            {ticketType === 'licence' && (
-              <View style={styles.formSection}>
-                <ThemedText style={styles.inputLabel}>MEDICAL CERTIFICATE / DOCUMENT</ThemedText>
-                {attachments.map((file) => (
-                  <View key={file.id} style={styles.attachmentItem}>
-                    <SymbolView name="doc.text" size={18} tintColor="#8E8E93" />
-                    <View style={styles.attachmentDetails}>
-                      <ThemedText style={styles.attachmentName}>{file.name}</ThemedText>
-                      <ThemedText style={styles.attachmentSize}>{file.size}</ThemedText>
-                    </View>
-                    <Pressable style={styles.removeAttachmentBtn} onPress={() => handleRemoveAttachment(file.id)}>
-                      <SymbolView name="xmark.circle.fill" size={18} tintColor="#FF3B30" />
-                    </Pressable>
-                  </View>
-                ))}
-
-                <Pressable
-                  style={[styles.uploadButton, errors.attachments && styles.inputErrorBorder]}
-                  onPress={() => setShowAttachmentModal(true)}
-                >
-                  <SymbolView name="plus" size={14} tintColor="#1EBD60" />
-                  <ThemedText style={styles.uploadButtonText}>Upload document</ThemedText>
-                </Pressable>
-                {errors.attachments ? <ThemedText style={styles.errorText}>{errors.attachments}</ThemedText> : null}
-              </View>
-            )}
-
-            {/* Overtime hours / date fields */}
-            {ticketType === 'overtime' && (
-              <View style={styles.formSection}>
-                <ThemedText style={styles.inputLabel}>OVERTIME DATE</ThemedText>
-                <Pressable
-                  style={[styles.dateInputButton, errors.overtimeDate && styles.inputErrorBorder]}
-                  onPress={() => {
-                    setSelectingDateType('start'); // reutilizamos modal de junio
-                    setShowDatePickerModal(true);
-                  }}
-                >
-                  <ThemedText style={[styles.dateInputText, !overtimeDate && { color: '#9E9E9E' }]}>
-                    {startDate || 'Select Date'}
-                  </ThemedText>
-                  <SymbolView name="calendar" size={18} tintColor="#8E8E93" />
-                </Pressable>
-                {errors.overtimeDate ? <ThemedText style={styles.errorText}>{errors.overtimeDate}</ThemedText> : null}
-
-                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>HOURS WORKED</ThemedText>
-                <TextInput
-                  style={[styles.textInput, errors.overtimeHours && styles.inputErrorBorder]}
-                  placeholder="e.g. 4.5"
-                  placeholderTextColor="#9E9E9E"
-                  keyboardType="numeric"
-                  value={overtimeHours}
-                  onChangeText={(text) => {
-                    setOvertimeHours(text);
-                    if (errors.overtimeHours) setErrors((prev) => ({ ...prev, overtimeHours: '' }));
-                  }}
-                />
-                {errors.overtimeHours ? <ThemedText style={styles.errorText}>{errors.overtimeHours}</ThemedText> : null}
-              </View>
-            )}
-
-            {/* Company Letter purpose / delivery fields */}
-            {ticketType === 'letter' && (
-              <View style={styles.formSection}>
-                <ThemedText style={styles.inputLabel}>PURPOSE OF LETTER</ThemedText>
-                <TextInput
-                  style={[styles.textInput, errors.purpose && styles.inputErrorBorder]}
-                  placeholder="e.g. Bank Loan, Visa Application"
-                  placeholderTextColor="#9E9E9E"
-                  value={purpose}
-                  onChangeText={(text) => {
-                    setPurpose(text);
-                    if (errors.purpose) setErrors((prev) => ({ ...prev, purpose: '' }));
-                  }}
-                />
-                {errors.purpose ? <ThemedText style={styles.errorText}>{errors.purpose}</ThemedText> : null}
-
-                <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>DELIVERY FORMAT</ThemedText>
-                <View style={styles.deliverySelector}>
-                  <Pressable
-                    style={[styles.deliveryOption, deliveryMethod === 'digital' && styles.deliveryOptionActive]}
-                    onPress={() => setDeliveryMethod('digital')}
-                  >
-                    <SymbolView name="paperplane" size={16} tintColor={deliveryMethod === 'digital' ? '#1EBD60' : '#8E8E93'} />
-                    <ThemedText style={[styles.deliveryText, deliveryMethod === 'digital' && { color: '#1EBD60' }]}>Digital PDF (Email)</ThemedText>
-                  </Pressable>
-
-                  <Pressable
-                    style={[styles.deliveryOption, deliveryMethod === 'printed' && styles.deliveryOptionActive]}
-                    onPress={() => setDeliveryMethod('printed')}
-                  >
-                    <SymbolView name="printer" size={16} tintColor={deliveryMethod === 'printed' ? '#1EBD60' : '#8E8E93'} />
-                    <ThemedText style={[styles.deliveryText, deliveryMethod === 'printed' && { color: '#1EBD60' }]}>Printed copy (HR)</ThemedText>
-                  </Pressable>
-                </View>
-              </View>
-            )}
-
-            {/* Description/Message input */}
-            <ThemedText style={[styles.inputLabel, { marginTop: Spacing.four }]}>REASON (OPTIONAL)</ThemedText>
-            <TextInput
-              style={[styles.textArea, errors.message && styles.inputErrorBorder]}
-              placeholder="Add any notes about your request..."
-              placeholderTextColor="#9E9E9E"
-              multiline
-              numberOfLines={4}
-              value={message}
-              onChangeText={(text) => {
-                setMessage(text);
-                if (errors.message) setErrors((prev) => ({ ...prev, message: '' }));
-              }}
+            {/* Dynamic Custom Fields */}
+            <DynamicFormFields
+              fields={fields}
+              values={dynamicValues}
+              errors={fieldErrors}
+              onChangeField={handleChangeField}
+              onOpenDatePicker={handleOpenDatePicker}
+              onOpenAttachmentPicker={handleOpenAttachmentPicker}
+              attachmentsByField={attachmentsByField}
+              onRemoveAttachment={handleRemoveAttachment}
             />
-            {errors.message ? <ThemedText style={styles.errorText}>{errors.message}</ThemedText> : null}
 
-            {/* Submit Actions */}
+            {/* General Comment / Notes */}
+            <View style={styles.commentSection}>
+              <ThemedText style={styles.inputLabel}>REASON / COMMENTS (OPTIONAL)</ThemedText>
+              <TextInput
+                style={styles.textArea}
+                placeholder="Add any additional notes about your request..."
+                placeholderTextColor="#9E9E9E"
+                multiline
+                numberOfLines={4}
+                value={generalComment}
+                onChangeText={setGeneralComment}
+              />
+            </View>
+
+            {/* Submit Action */}
             <Pressable
               style={[styles.btnSubmit, isSubmitting && styles.btnSubmitDisabled]}
               disabled={isSubmitting}
@@ -461,7 +460,7 @@ export default function NewTicketScreen() {
               )}
             </Pressable>
 
-            {/* Supervisor review notice */}
+            {/* Notice */}
             <ThemedText style={styles.formNoticeText}>
               Your supervisor will review this request and notify you of the decision.
             </ThemedText>
@@ -485,7 +484,13 @@ export default function NewTicketScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
             <View style={styles.modalHeader}>
-              <ThemedText style={styles.modalTitle}>Select Date (June 2026)</ThemedText>
+              <ThemedText style={styles.modalTitle}>
+                {isSelectingRange
+                  ? rangeStartDate
+                    ? 'Select End Date'
+                    : 'Select Start Date'
+                  : 'Select Date'}
+              </ThemedText>
               <Pressable onPress={() => setShowDatePickerModal(false)}>
                 <SymbolView name="xmark" size={20} tintColor="#000000" />
               </Pressable>
@@ -495,23 +500,23 @@ export default function NewTicketScreen() {
 
             <View style={styles.calendarGrid}>
               {juneDays.map((day) => {
-                const isSelected = selectingDateType === 'start'
-                  ? startDate === `June ${day}, 2026`
-                  : endDate === `June ${day}, 2026`;
+                const dateStr = `06/${day < 10 ? '0' + day : day}/2026`;
+                const isSelected = activeDateFieldId
+                  ? dynamicValues[activeDateFieldId] === dateStr || rangeStartDate === dateStr
+                  : false;
 
                 return (
                   <Pressable
                     key={day}
                     style={[styles.calendarDay, isSelected && styles.calendarDaySelected]}
-                    onPress={() => {
-                      if (ticketType === 'overtime') {
-                        setOvertimeDate(`June ${day}, 2026`);
-                        setStartDate(`June ${day}, 2026`);
-                      }
-                      handleSelectDay(day);
-                    }}
+                    onPress={() => handleSelectCalendarDay(day)}
                   >
-                    <ThemedText style={[styles.calendarDayText, isSelected && { color: '#ffffff', fontWeight: '700' }]}>
+                    <ThemedText
+                      style={[
+                        styles.calendarDayText,
+                        isSelected && { color: '#ffffff', fontWeight: '700' },
+                      ]}
+                    >
                       {day}
                     </ThemedText>
                   </Pressable>
@@ -547,7 +552,9 @@ export default function NewTicketScreen() {
                   <SymbolView name="doc.fill" size={20} tintColor="#1EBD60" />
                   <View style={styles.modalListDetails}>
                     <ThemedText type="smallBold">{file.name}</ThemedText>
-                    <ThemedText type="small" themeColor="textSecondary">{file.size}</ThemedText>
+                    <ThemedText type="small" themeColor="textSecondary">
+                      {file.size}
+                    </ThemedText>
                   </View>
                 </Pressable>
               ))}
@@ -566,9 +573,20 @@ const styles = StyleSheet.create({
   stepContainer: {
     flex: 1,
   },
+  loadingContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.six,
+    gap: Spacing.three,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#60646C',
+  },
   selectHeader: {
     paddingHorizontal: Spacing.four,
-    paddingVertical: Spacing.five,
+    paddingVertical: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
@@ -578,12 +596,25 @@ const styles = StyleSheet.create({
     color: '#60646C',
     fontWeight: '600',
   },
+  categoriesScrollContent: {
+    paddingHorizontal: Spacing.four,
+    gap: Spacing.five,
+  },
+  categorySection: {
+    gap: Spacing.two,
+  },
+  categorySectionHeader: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#8E8E93',
+    letterSpacing: 0.8,
+    marginLeft: Spacing.one,
+  },
   optionsCard: {
     backgroundColor: '#ffffff',
     borderRadius: Spacing.three,
     borderWidth: 1,
     borderColor: '#EFEFEF',
-    marginHorizontal: Spacing.four,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
@@ -598,107 +629,60 @@ const styles = StyleSheet.create({
     gap: Spacing.three,
   },
   optionIconWrapper: {
-    width: 44,
-    height: 44,
-    borderRadius: 8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
   optionTextWrapper: {
     flex: 1,
-    gap: 2,
   },
   optionTitle: {
     fontSize: 16,
-    fontWeight: '700',
-    color: '#000000',
+    fontWeight: '600',
+    color: '#1F2937',
   },
   optionDesc: {
     fontSize: 13,
-    color: '#8E8E93',
+    color: '#6B7280',
+    marginTop: 2,
   },
   optionDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E0E1E6',
-    marginLeft: Spacing.four + 44 + Spacing.three,
+    height: 1,
+    backgroundColor: '#F3F4F6',
+    marginLeft: 60,
   },
   formScrollContent: {
+    padding: Spacing.four,
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
     width: '100%',
-    paddingTop: Spacing.three,
+    gap: Spacing.four,
   },
-  gaugeContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    borderRadius: Spacing.three,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    marginHorizontal: Spacing.four,
-    padding: Spacing.four,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 2,
-    marginBottom: Spacing.four,
-  },
-  gaugeCircle: {
-    width: 160,
-    height: 160,
-    borderRadius: 80,
-    borderWidth: 9,
-    borderColor: '#EFEFEF',
-    borderTopColor: '#1EBD60',
-    borderRightColor: '#1EBD60',
-    borderBottomColor: '#1EBD60',
-    alignItems: 'center',
-    justifyContent: 'center',
-    transform: [{ rotate: '45deg' }],
-    marginVertical: Spacing.three,
-  },
-  gaugeNumber: {
-    fontSize: 32,
-    paddingTop: 8,
-    fontWeight: '800',
-    color: '#000000',
-    transform: [{ rotate: '-45deg' }], // rotate text back
-  },
-  gaugeLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#8E8E93',
-    marginTop: 2,
-    transform: [{ rotate: '-45deg' }], // rotate text back
-  },
-  gaugeStatsRow: {
+  metaBanner: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingVertical: 10,
-    paddingHorizontal: Spacing.two,
+    gap: Spacing.three,
   },
-  gaugeStatText: {
-    fontSize: 14,
-    color: '#60646C',
+  metaBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.one,
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.one,
+    borderRadius: 12,
   },
-  gaugeStatValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#000000',
-  },
-  gaugeStatsDivider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E0E1E6',
-    width: '100%',
+  metaBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#007AFF',
   },
   formCard: {
     backgroundColor: '#ffffff',
     borderRadius: Spacing.three,
     borderWidth: 1,
     borderColor: '#EFEFEF',
-    marginHorizontal: Spacing.four,
     padding: Spacing.four,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -706,216 +690,144 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 2,
   },
-  formSection: {
-    gap: 1,
+  commentSection: {
+    marginTop: Spacing.four,
   },
   inputLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#8E8E93',
+    color: '#60646C',
+    letterSpacing: 0.5,
     marginBottom: Spacing.two,
-  },
-  dateInputButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
-    paddingHorizontal: Spacing.three,
-    backgroundColor: '#F7F8FA',
-  },
-  dateInputText: {
-    fontSize: 15,
-    color: '#000000',
-  },
-  textInput: {
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
-    paddingHorizontal: Spacing.three,
-    fontSize: 15,
-    backgroundColor: '#F7F8FA',
   },
   textArea: {
+    backgroundColor: '#F9FAFB',
     borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
+    borderColor: '#E5E7EB',
+    borderRadius: Spacing.two,
     paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
+    paddingVertical: 12,
     fontSize: 15,
-    height: 100,
-    backgroundColor: '#F7F8FA',
+    color: '#111827',
+    minHeight: 90,
     textAlignVertical: 'top',
-    marginBottom: Spacing.four,
-  },
-  inputErrorBorder: {
-    borderColor: '#FF3B30',
-  },
-  errorText: {
-    color: '#FF3B30',
-    fontSize: 12,
-    marginTop: Spacing.one,
-  },
-  attachmentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
-    padding: Spacing.three,
-    gap: Spacing.three,
-    marginBottom: Spacing.two,
-  },
-  attachmentDetails: {
-    flex: 1,
-  },
-  attachmentName: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  attachmentSize: {
-    fontSize: 11,
-    color: '#8E8E93',
-  },
-  removeAttachmentBtn: {
-    padding: Spacing.one,
-  },
-  uploadButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    borderWidth: 1.5,
-    borderStyle: 'dashed',
-    borderColor: '#1EBD60',
-    borderRadius: 8,
-    gap: Spacing.two,
-    backgroundColor: '#E8F5E9',
-  },
-  uploadButtonText: {
-    color: '#1EBD60',
-    fontWeight: '700',
-    fontSize: 14,
-  },
-  deliverySelector: {
-    flexDirection: 'row',
-    gap: Spacing.two,
-  },
-  deliveryOption: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    height: 48,
-    borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
-    gap: Spacing.two,
-    backgroundColor: '#F7F8FA',
-  },
-  deliveryOptionActive: {
-    borderColor: '#1EBD60',
-    backgroundColor: '#E8F5E9',
-  },
-  deliveryText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#60646C',
   },
   btnSubmit: {
     backgroundColor: '#1EBD60',
-    height: 48,
+    borderRadius: Spacing.two,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 8,
-    marginTop: Spacing.three,
+    marginTop: Spacing.five,
   },
   btnSubmitDisabled: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
   btnSubmitText: {
     color: '#ffffff',
     fontSize: 16,
   },
   formNoticeText: {
-    color: '#8E8E93',
     fontSize: 12,
+    color: '#8E8E93',
     textAlign: 'center',
-    marginTop: Spacing.four,
-    lineHeight: 16,
+    marginTop: Spacing.three,
   },
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.four,
+    justifyContent: 'flex-end',
   },
   modalContainer: {
-    width: '100%',
-    maxWidth: 360,
-    borderRadius: Spacing.three,
-    padding: Spacing.four,
     backgroundColor: '#ffffff',
-    maxHeight: '80%',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.four,
+    gap: Spacing.three,
   },
   modalHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: Spacing.three,
   },
   modalTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
+    color: '#111827',
   },
   calendarSubheader: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#8E8E93',
-    marginBottom: Spacing.three,
+    color: '#6B7280',
   },
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: Spacing.two,
-    justifyContent: 'flex-start',
+    gap: 8,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.four,
   },
   calendarDay: {
-    width: '12%',
-    aspectRatio: 1,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-    marginBottom: Spacing.two,
   },
   calendarDaySelected: {
     backgroundColor: '#1EBD60',
-    borderColor: '#1EBD60',
   },
   calendarDayText: {
-    fontSize: 12,
-    color: '#000000',
+    fontSize: 14,
+    color: '#1F2937',
   },
   modalList: {
     gap: Spacing.two,
+    marginTop: Spacing.two,
+    marginBottom: Spacing.four,
   },
   modalListItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: Spacing.three,
-    borderWidth: 1,
-    borderColor: '#E0E1E6',
-    borderRadius: 8,
     gap: Spacing.three,
+    padding: Spacing.three,
+    backgroundColor: '#F9FAFB',
+    borderRadius: Spacing.two,
   },
   modalListDetails: {
     flex: 1,
+  },
+  emptyCategoriesContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.six,
+    paddingVertical: Spacing.six,
+    gap: Spacing.two,
+  },
+  emptyCategoriesTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: Spacing.two,
+    textAlign: 'center',
+  },
+  emptyCategoriesSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: Spacing.three,
+  },
+  retryBtn: {
+    backgroundColor: '#1EBD60',
+    paddingHorizontal: Spacing.five,
+    paddingVertical: Spacing.two,
+    borderRadius: Spacing.two,
+  },
+  retryBtnText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });

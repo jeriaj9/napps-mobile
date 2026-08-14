@@ -33,37 +33,87 @@ export interface EmployeeItem {
   employee_id?: string;
 }
 
-export interface CustomFieldDef {
+export interface CustomField {
   id: number;
-  request_type_id: number;
-  name: string;
-  label: string;
   type: string;
+  display_order?: number;
+  label: string;
+  name?: string;
+  placeholder?: string | null;
+  default_value?: string | null;
+  is_required?: boolean;
+  options?: string | null;
+}
+
+export interface RequestType {
+  id: number;
+  name: string;
+  description?: string;
+  priority?: string;
+  sla?: number;
+  custom_fields?: CustomField[];
+}
+
+export interface TicketCategory {
+  id: number;
+  name: string;
+  description?: string;
+  icon?: string;
+  request_types?: RequestType[];
+}
+
+export interface CreateTicketPayload {
+  request_type_id: number;
+  comment?: string;
+  priority?: string;
+  custom_fields?: Array<{ custom_field_id: number; value: string }>;
 }
 
 /**
- * Fetches all tickets accessible by the authenticated user.
+ * Fetches ticket categories with nested request types and custom fields.
  */
-// export async function fetchTickets(token: string): Promise<BackendTicket[]> {
-//   const response = await fetch(`${API_BASE}/tickets`, {
-//     method: 'GET',
-//     headers: getAuthHeaders(token),
-//   });
+export async function fetchTicketsCategories(token: string): Promise<TicketCategory[]> {
+  try {
+    const response = await fetch(`${API_BASE}/mobile/tickets/categories`, {
+      method: 'GET',
+      headers: getAuthHeaders(token),
+    });
 
-//   if (!response.ok) {
-//     throw new Error(`Failed to fetch tickets (${response.status})`);
-//   }
+    if (!response.ok) return [];
 
-//   const result = await response.json();
-//   console.log('tickets data: ', result?.data);
-//   if (result.status && Array.isArray(result.data)) {
-//     return result.data;
-//   } else if (Array.isArray(result)) {
-//     return result;
-//   }
-//   return [];
-// }
+    const result = await response.json();
+    if (result.status && Array.isArray(result.data)) {
+      return result.data;
+    }
+    return [];
+  } catch (err) {
+    console.error('Failed to fetch ticket categories:', err);
+    return [];
+  }
+}
 
+/**
+ * Creates a new ticket on the backend.
+ */
+export async function createTicket(token: string, payload: CreateTicketPayload): Promise<boolean> {
+  try {
+    const response = await fetch(`${API_BASE}/mobile/tickets`, {
+      method: 'POST',
+      headers: getAuthHeaders(token),
+      body: JSON.stringify(payload),
+    });
+    if (!response.ok) return false;
+    const result = await response.json();
+    return result.status === true;
+  } catch (err) {
+    console.error('Failed to create ticket:', err);
+    return false;
+  }
+}
+
+/**
+ * Fetches all tickets for a specific employee.
+ */
 export async function fetchMyTickets(token: string, employeeId: string): Promise<BackendTicket[]> {
   console.log('employee_id: ', employeeId);
   const response = await fetch(`${API_BASE}/mobile/tickets?createdBy=${employeeId}`, {
@@ -170,7 +220,7 @@ export async function fetchTicketFields(token: string, ticketId: number): Promis
 /**
  * Fetches custom field definitions for a request type.
  */
-export async function fetchCustomFieldsDefs(token: string, requestTypeId: number): Promise<CustomFieldDef[]> {
+export async function fetchCustomFieldsDefs(token: string, requestTypeId: number): Promise<CustomField[]> {
   try {
     const response = await fetch(`${API_BASE}/ticket-custom-fields/${requestTypeId}`, {
       method: 'GET',
@@ -222,7 +272,7 @@ export async function fetchTicketById(token: string, ticketId: string | number):
       fieldDefs.forEach((def) => {
         const valObj = customFieldsValues.find((v) => v.custom_field_id === def.id);
         if (valObj && valObj.value != null && valObj.value.trim() !== '') {
-          const keyName = def.label || def.name;
+          const keyName = def.label || def.name || String(def.id);
           customFieldsDict[keyName] = valObj.value;
         }
       });
