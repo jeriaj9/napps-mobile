@@ -154,6 +154,7 @@ export default function TicketsScreen() {
 
   useEffect(() => {
     if (ticketCreated === 'true') {
+      loadTickets(true);
       const initTimer = setTimeout(() => {
         setShowSuccessToast(true);
       }, 0);
@@ -168,7 +169,7 @@ export default function TicketsScreen() {
         clearTimeout(timer);
       };
     }
-  }, [ticketCreated, router]);
+  }, [ticketCreated, router, loadTickets]);
 
   return (
     <View style={[styles.container, { backgroundColor: '#F7F8FA' }]}>

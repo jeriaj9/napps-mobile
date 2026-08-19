@@ -63,10 +63,10 @@ export interface TicketCategory {
 }
 
 export interface CreateTicketPayload {
-  request_type_id: number;
+  requestTypeId: number;
   comment?: string;
   priority?: string;
-  custom_fields?: Array<{ custom_field_id: number; value: string }>;
+  ticketFields?: Array<{ custom_field_id: number; value: string }>;
 }
 
 /**
@@ -93,18 +93,25 @@ export async function fetchTicketsCategories(token: string): Promise<TicketCateg
 }
 
 /**
- * Creates a new ticket on the backend.
+ * Creates a new ticket on the backend via POST /mobile/tickets.
  */
 export async function createTicket(token: string, payload: CreateTicketPayload): Promise<boolean> {
   try {
+    const formattedBody = {
+      requestTypeId: payload.requestTypeId,
+      comment: payload.comment && payload.comment.trim() !== '' ? payload.comment.trim() : 'No comments.',
+      priority: payload.priority || 'medium',
+      ticketFields: payload.ticketFields || [],
+    };
+
     const response = await fetch(`${API_BASE}/mobile/tickets`, {
       method: 'POST',
       headers: getAuthHeaders(token),
-      body: JSON.stringify(payload),
+      body: JSON.stringify(formattedBody),
     });
     if (!response.ok) return false;
     const result = await response.json();
-    return result.status === true;
+    return result.status === true || response.status === 200 || response.status === 201;
   } catch (err) {
     console.error('Failed to create ticket:', err);
     return false;

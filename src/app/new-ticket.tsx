@@ -272,18 +272,22 @@ export default function NewTicketScreen() {
       }));
 
       if (accessToken) {
-        await createTicket(accessToken, {
-          request_type_id: selectedRequestType.id,
-          comment: generalComment,
+        const success = await createTicket(accessToken, {
+          requestTypeId: selectedRequestType.id,
+          comment: generalComment.trim() || 'No comments.',
           priority: selectedRequestType.priority || 'medium',
-          custom_fields: customFieldsPayload,
+          ticketFields: customFieldsPayload,
         });
+
+        if (success) {
+          router.replace('/(tabs)/tickets?ticketCreated=true');
+          return;
+        }
       }
     } catch (err) {
       console.error('Failed to submit ticket:', err);
     } finally {
       setIsSubmitting(false);
-      router.replace('/(tabs)/tickets?ticketCreated=true');
     }
   };
 
