@@ -150,13 +150,13 @@ export default function TicketDetailScreen() {
         <View style={styles.card}>
           {/* Header row with Icon and status */}
           <View style={styles.headerRow}>
-            <View style={[styles.iconWrapper, { backgroundColor: getStatusBgColor(ticket.status) }]}>
+            {/* <View style={[styles.iconWrapper, { backgroundColor: getStatusBgColor(ticket.status) }]}>
               <SymbolView
                 name={getTicketIcon(ticket.requestType) as any}
                 size={32}
                 tintColor={getStatusColor(ticket.status)}
               />
-            </View>
+            </View> */}
             <View style={[styles.statusBadge, { backgroundColor: getStatusBgColor(ticket.status) }]}>
               <ThemedText style={[styles.statusText, { color: getStatusColor(ticket.status) }]}>
                 {ticket.status}

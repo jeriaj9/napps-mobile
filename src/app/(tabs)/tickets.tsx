@@ -125,7 +125,7 @@ export default function TicketsScreen() {
   const getMetrics = () => {
     const list = isMyTickets ? myTickets : pendingRequests;
     const total = list.length;
-    const open = list.filter(t => t.status === 'PENDING' || t.status === 'OPEN').length;
+    const open = list.filter(t => t.status === 'PENDING' || t.status === 'OPEN' || t.status === 'IN PROGRESS').length;
     const resolved = list.filter(t => t.status === 'APPROVED' || t.status === 'RESOLVED').length;
     const needAttention = isMyTickets
       ? list.filter(t => t.status === 'DENIED' || t.status === 'IN PROGRESS').length
@@ -199,7 +199,7 @@ export default function TicketsScreen() {
             </ThemedText>
           </View>
 
-          {metrics.needAttention !== undefined && (
+          {activeTab !== "myTickets" && metrics.needAttention !== undefined && (
             <>
               <View style={styles.metricDivider} />
               <View style={styles.metricColumn}>

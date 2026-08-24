@@ -98,13 +98,13 @@ export function TicketCard({
     <View style={styles.cardContainer}>
       <Pressable style={styles.rowContainer} onPress={handlePress}>
         <View style={styles.leftCol}>
-          <View style={styles.iconWrapper}>
+          {/* <View style={styles.iconWrapper}>
             <SymbolView
               name={getTicketIcon(ticket.requestType) as any}
               size={26}
               tintColor={getIconColor(ticket.requestType)}
             />
-          </View>
+          </View> */}
           <View style={styles.textContainer}>
             {ticket.createdBy && (
               <ThemedText style={styles.employeeText}>
