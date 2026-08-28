@@ -18,6 +18,8 @@ export interface BenefitProps {
   description?: string;
   thumbnailInitials?: string;
   isEnjoying?: boolean;
+  status?: 'active' | 'pending' | 'available' | 'locked' | string;
+  lockReason?: string;
 }
 
 export function BenefitCard({
@@ -79,6 +81,45 @@ export function BenefitCard({
     ? `${benefit.maxUsageCount} ${benefit.maxUsageCount === 1 ? 'time' : 'times'}`
     : benefit.maxUsageCount;
 
+  const renderStatusOrAction = () => {
+    if (benefit.isEnjoying || benefit.status === 'active') {
+      return (
+        <View style={styles.badgeContainer}>
+          <View style={styles.activeBadge}>
+            <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
+            <ThemedText style={styles.activeText}>Enrolled</ThemedText>
+          </View>
+        </View>
+      );
+    }
+    if (benefit.status === 'pending') {
+      return (
+        <View style={styles.badgeContainer}>
+          <View style={styles.pendingBadge}>
+            <SymbolView name="clock.fill" size={12} tintColor="#FFB000" />
+            <ThemedText style={styles.pendingText}>Pending Review</ThemedText>
+          </View>
+        </View>
+      );
+    }
+    if (benefit.status === 'locked') {
+      return (
+        <View style={styles.badgeContainer}>
+          <View style={styles.lockedBadge}>
+            <SymbolView name="lock.fill" size={12} tintColor="#8E8E93" />
+            <ThemedText style={styles.lockedText}>Locked</ThemedText>
+          </View>
+        </View>
+      );
+    }
+    return (
+      <Pressable style={styles.requestButton} onPress={onRequest}>
+        <SymbolView name="plus" size={12} tintColor="#ffffff" />
+        <ThemedText style={styles.requestButtonText}>Request</ThemedText>
+      </Pressable>
+    );
+  };
+
   const cardContent = (
     <Pressable onPress={handlePress}>
       <ThemedView style={styles.card} type="background">
@@ -116,19 +157,7 @@ export function BenefitCard({
               </View>
             </View>
             
-            {benefit.isEnjoying ? (
-              <View style={styles.badgeContainer}>
-                <View style={styles.activeBadge}>
-                  <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
-                  <ThemedText style={styles.activeText}>Enrolled</ThemedText>
-                </View>
-              </View>
-            ) : (
-              <Pressable style={styles.requestButton} onPress={onRequest}>
-                <SymbolView name="plus" size={12} tintColor="#ffffff" />
-                <ThemedText style={styles.requestButtonText}>Request</ThemedText>
-              </Pressable>
-            )}
+            {renderStatusOrAction()}
           </View>
         </View>
       </ThemedView>
@@ -234,6 +263,34 @@ const styles = StyleSheet.create({
   },
   activeText: {
     color: '#1EBD60',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  pendingBadge: {
+    backgroundColor: '#FFF9E6',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pendingText: {
+    color: '#FFB000',
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  lockedBadge: {
+    backgroundColor: '#F4F5F7',
+    paddingHorizontal: Spacing.two,
+    paddingVertical: 4,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  lockedText: {
+    color: '#8E8E93',
     fontSize: 11,
     fontWeight: '700',
   },

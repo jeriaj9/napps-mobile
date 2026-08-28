@@ -72,7 +72,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
       >
         <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
           <SymbolView
-            name={isFocused ? iconFocusedName : iconName}
+            name={(isFocused ? iconFocusedName : iconName) as any}
             size={22}
             tintColor={isFocused ? '#1EBD60' : '#8E8E93'}
           />

@@ -1,73 +1,100 @@
-import { useRouter, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BenefitProps } from '@/components/benefits/benefit-card';
 import { ScreenHeader } from '@/components/ScreenHeader';
 import { ThemedText } from '@/components/themed-text';
-import { BenefitProps } from '@/components/benefits/benefit-card';
-import { TicketProps } from '@/components/tickets/ticket-card';
-import { mockAllBenefits, mockEnjoyingBenefits } from '@/constants/mockBenefitsData';
-import { addTicket, mockPendingRequests } from '@/constants/mockTicketsData';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import {
+  fetchEmployeeBenefits,
+  mapBackendBenefitToBenefitProps,
+  requestBenefit,
+} from '@/services/benefitService';
+import { useAuthStore } from '@/store/authStore';
 
 export default function BenefitDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { accessToken, user } = useAuthStore();
 
-  // Find the benefit details from either available or enjoying lists
-  const findBenefit = (): BenefitProps | undefined => {
-    const isEnrolled = mockEnjoyingBenefits.some((item) => item.id === id);
-    const item = mockAllBenefits.find((b) => b.id === id);
-    if (item) {
-      return { ...item, isEnjoying: isEnrolled };
+  const [benefit, setBenefit] = useState<BenefitProps | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const loadBenefitDetail = useCallback(async () => {
+    const employeeId = user?.id || user?.employee_id || user?.party_id;
+
+    if (!accessToken || !employeeId) {
+      setError('User not authenticated. Please log in.');
+      setIsLoading(false);
+      return;
     }
-    return mockEnjoyingBenefits.find((b) => b.id === id);
-  };
 
-  const benefitObj = findBenefit();
-  const [benefit] = useState<BenefitProps | undefined>(benefitObj);
+    if (!id) {
+      setError('Benefit ID not specified.');
+      setIsLoading(false);
+      return;
+    }
 
-  // Check if a request is already pending for this benefit
-  const hasPendingRequest = () => {
-    if (!benefit) return false;
-    return mockPendingRequests.some(
-      (req) => req.status === 'PENDING' && req.description === benefit.title
-    );
-  };
+    setIsLoading(true);
+    setError(null);
 
-  const [isRequested, setIsRequested] = useState(hasPendingRequest());
+    try {
+      const allBenefits = await fetchEmployeeBenefits(accessToken, Number(employeeId));
+      const foundBackend = allBenefits.find((b) => String(b.id) === String(id));
 
-  if (!benefit) {
-    return (
-      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
-        <ScreenHeader title="Benefit Details" onBackPress={() => router.back()} />
-        <View style={styles.errorContainer}>
-          <SymbolView name="exclamationmark.triangle.fill" size={48} tintColor="#FF3B30" />
-          <ThemedText style={styles.errorText}>Benefit not found</ThemedText>
-          <Pressable style={styles.btnBack} onPress={() => router.back()}>
-            <ThemedText style={styles.btnBackText}>Go Back</ThemedText>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
+      if (foundBackend) {
+        setBenefit(mapBackendBenefitToBenefitProps(foundBackend));
+      } else {
+        setError('Benefit not found or unavailable.');
+      }
+    } catch (err: any) {
+      console.error(`Error loading benefit detail ${id}:`, err);
+      setError('Unable to load benefit details. Please check your network connection.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [accessToken, user, id]);
 
-  const handleRequest = () => {
-    alert(`Enrollment request for "${benefit.title}" submitted successfully!`);
-    const newRequest: TicketProps = {
-      id: `req-${benefit.title.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-      status: 'PENDING',
-      employee: { name: 'SAMUEL LUIS', id: 'NT-2037' },
-      requestType: 'Benefit: ' + benefit.title,
-      description: benefit.title,
-      requestDate: 'Jun 10',
-      priority: 'Medium',
-    };
-    addTicket(newRequest);
-    setIsRequested(true);
+  useEffect(() => {
+    loadBenefitDetail();
+  }, [loadBenefitDetail]);
+
+  const handleRequest = async () => {
+    if (!benefit || !id) return;
+    const employeeId = user?.id || user?.employee_id || user?.party_id;
+
+    if (!accessToken || !employeeId) {
+      Alert.alert('Error', 'User not authenticated.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await requestBenefit(accessToken, Number(id), Number(employeeId));
+      Alert.alert(
+        'Request Submitted',
+        `Enrollment request for "${benefit.title}" submitted successfully!`
+      );
+      loadBenefitDetail();
+    } catch (err: any) {
+      Alert.alert('Request Failed', err.message || 'Could not submit benefit request.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getBenefitIcon = (title: string) => {
@@ -91,6 +118,38 @@ export default function BenefitDetailScreen() {
     }
     return 'gift';
   };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
+        <ScreenHeader title="Benefit Details" onBackPress={() => router.back()} />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#1EBD60" />
+          <ThemedText style={styles.loadingText}>Loading benefit details...</ThemedText>
+        </View>
+      </View>
+    );
+  }
+
+  if (error || !benefit) {
+    return (
+      <View style={[styles.container, { paddingTop: insets.top, backgroundColor: '#F7F8FA' }]}>
+        <ScreenHeader title="Benefit Details" onBackPress={() => router.back()} />
+        <View style={styles.errorContainer}>
+          <SymbolView name="exclamationmark.triangle.fill" size={48} tintColor="#FF3B30" />
+          <ThemedText style={styles.errorTitle}>Error Loading Benefit</ThemedText>
+          <ThemedText style={styles.errorMessage}>{error || 'Benefit not found'}</ThemedText>
+          <Pressable style={styles.btnBack} onPress={() => router.back()}>
+            <ThemedText style={styles.btnBackText}>Go Back</ThemedText>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  const isEnrolled = benefit.isEnjoying || benefit.status === 'active';
+  const isPending = benefit.status === 'pending';
+  const isLocked = benefit.status === 'locked';
 
   const durationText = typeof benefit.maxUsageDurationMonths === 'number'
     ? `${benefit.maxUsageDurationMonths} months`
@@ -128,15 +187,20 @@ export default function BenefitDetailScreen() {
                 />
               </View>
             )}
-            {benefit.isEnjoying ? (
+            {isEnrolled ? (
               <View style={styles.activeBadge}>
                 <SymbolView name="checkmark.circle.fill" size={12} tintColor="#1EBD60" />
                 <ThemedText style={styles.activeText}>Enrolled</ThemedText>
               </View>
-            ) : isRequested ? (
+            ) : isPending ? (
               <View style={styles.pendingBadge}>
                 <SymbolView name="clock.fill" size={12} tintColor="#FFB000" />
                 <ThemedText style={styles.pendingText}>Pending Review</ThemedText>
+              </View>
+            ) : isLocked ? (
+              <View style={styles.lockedBadge}>
+                <SymbolView name="lock.fill" size={12} tintColor="#8E8E93" />
+                <ThemedText style={styles.lockedText}>Locked</ThemedText>
               </View>
             ) : (
               <View style={styles.inactiveBadge}>
@@ -193,26 +257,46 @@ export default function BenefitDetailScreen() {
 
           <View style={styles.divider} />
 
-          {/* Action button */}
-          {!benefit.isEnjoying && !isRequested && (
-            <Pressable style={styles.btnEnroll} onPress={handleRequest}>
-              <SymbolView name="plus" size={16} tintColor="#ffffff" />
-              <ThemedText type="smallBold" style={styles.btnEnrollText}>
-                Request Enrollment
-              </ThemedText>
+          {/* Action button & Status Cards */}
+          {!isEnrolled && !isPending && !isLocked && (
+            <Pressable
+              style={[styles.btnEnroll, isSubmitting && styles.btnDisabled]}
+              onPress={handleRequest}
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <SymbolView name="plus" size={16} tintColor="#ffffff" />
+                  <ThemedText type="smallBold" style={styles.btnEnrollText}>
+                    Request Enrollment
+                  </ThemedText>
+                </>
+              )}
             </Pressable>
           )}
 
-          {isRequested && (
+          {isPending && (
             <View style={styles.requestStatusCard}>
               <SymbolView name="info.circle.fill" size={16} tintColor="#FFB000" />
               <ThemedText style={styles.requestStatusText}>
-                Your enrollment request has been submitted and is currently pending review by your supervisor.
+                Your enrollment request has been submitted and is currently pending review by HR.
               </ThemedText>
             </View>
           )}
 
-          {benefit.isEnjoying && (
+          {isLocked && (
+            <View style={styles.lockedStatusCard}>
+              <SymbolView name="lock.fill" size={16} tintColor="#8E8E93" />
+              <ThemedText style={styles.lockedStatusText}>
+                {benefit.lockReason ||
+                  `You do not currently meet the minimum tenure requirement (${benefit.minTimeAtCompany}) to enroll in this benefit.`}
+              </ThemedText>
+            </View>
+          )}
+
+          {isEnrolled && (
             <View style={styles.enrolledStatusCard}>
               <SymbolView name="checkmark.seal.fill" size={16} tintColor="#1EBD60" />
               <ThemedText style={styles.enrolledStatusText}>
@@ -226,7 +310,6 @@ export default function BenefitDetailScreen() {
   );
 }
 
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -237,24 +320,43 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingTop: Spacing.four,
   },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.five,
+    marginTop: 60,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#60646C',
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: Spacing.five,
-    marginTop: 100,
+    marginTop: 60,
+    gap: 12,
   },
-  errorText: {
+  errorTitle: {
     fontSize: 18,
     fontWeight: '700',
-    marginTop: Spacing.three,
-    marginBottom: Spacing.four,
+    color: '#000000',
+  },
+  errorMessage: {
+    fontSize: 14,
+    color: '#60646C',
+    textAlign: 'center',
+    lineHeight: 20,
   },
   btnBack: {
     backgroundColor: '#1EBD60',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 8,
+    marginTop: 8,
   },
   btnBackText: {
     color: '#ffffff',
@@ -327,6 +429,20 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  lockedBadge: {
+    backgroundColor: '#F4F5F7',
+    paddingHorizontal: Spacing.three,
+    paddingVertical: 6,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  lockedText: {
+    color: '#8E8E93',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   inactiveBadge: {
     backgroundColor: '#F4F5F7',
     paddingHorizontal: Spacing.three,
@@ -386,6 +502,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     gap: Spacing.two,
   },
+  btnDisabled: {
+    opacity: 0.6,
+  },
   btnEnrollText: {
     color: '#ffffff',
     fontSize: 14,
@@ -404,6 +523,21 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 12,
     color: '#E65100',
+    lineHeight: 18,
+  },
+  lockedStatusCard: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+    backgroundColor: '#F4F5F7',
+    padding: Spacing.three,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  lockedStatusText: {
+    flex: 1,
+    fontSize: 12,
+    color: '#616161',
     lineHeight: 18,
   },
   enrolledStatusCard: {
